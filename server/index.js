@@ -124,6 +124,7 @@ io.on('connection', (socket) => {
       isPaused: false,
       pausedBy: null, // Track who paused
       lastQuestion: null,
+      lastTransaction: null,
       gameOver: false,
       winner: null
     };
@@ -178,13 +179,25 @@ io.on('connection', (socket) => {
     const targetCardIndex = targetHand.findIndex(c => c.id === card.id);
     
     if (targetCardIndex !== -1) {
-      // Transfer card - NO LOGGING (no history rule)
       const transferredCard = targetHand.splice(targetCardIndex, 1)[0];
       askerHand.push(transferredCard);
       
-      // Asker continues, no log entry
+      gameState.lastTransaction = {
+        type: 'CARD_GIVEN',
+        askerId: socket.id,
+        targetId,
+        card: transferredCard,
+        timestamp: Date.now()
+      };
     } else {
-      // Card not found - NO LOGGING (no history rule)
+      gameState.lastTransaction = {
+        type: 'CARD_NOT_FOUND',
+        askerId: socket.id,
+        targetId,
+        card,
+        timestamp: Date.now()
+      };
+
       gameState.currentPlayer = targetId;
     }
     

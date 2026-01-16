@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Play, Pause, Trophy, AlertCircle, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Play, Pause, Trophy, AlertCircle, X, ArrowRight, CheckCircle, XCircle } from 'lucide-react';
 import Card from './Card';
 import { getHalfSuit, SUITS, LOW_CARDS, HIGH_CARDS, getCardDisplay } from '../lib/constants';
 
@@ -13,9 +13,26 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
   const [claimDistribution, setClaimDistribution] = useState({});
   const [showInstructions, setShowInstructions] = useState(false);
 
+  const [showTransactionAnimation, setShowTransactionAnimation] = useState(false);
+  const [prevTransaction, setPrevTransaction] = useState(null);
 
   const gameState = room.gameState;
   const players = room.players;
+
+  useEffect(() => {
+    if (gameState.lastTransaction && 
+        gameState.lastTransaction.timestamp !== prevTransaction?.timestamp) {
+      setShowTransactionAnimation(true);
+      setPrevTransaction(gameState.lastTransaction);
+      
+      // Hide animation after 4 seconds
+      const timer = setTimeout(() => {
+        setShowTransactionAnimation(false);
+      }, 4000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [gameState.lastTransaction]);
   
   const getPlayerTeam = (playerId) => {
     return gameState.teams.A.includes(playerId) ? 'A' : 'B';
@@ -215,9 +232,96 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
     );
   }
 
+  const myPlayer = players.find(p => p.id === socket.id);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-800 to-cyan-900 p-4">
       <div className="max-w-7xl mx-auto">
+        {/* Transaction Animation Overlay */}
+        {showTransactionAnimation && gameState.lastTransaction && (
+          <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+            <div className="bg-white/95 backdrop-blur-lg rounded-3xl shadow-2xl p-8 max-w-2xl w-full mx-4 animate-[slideIn_0.5s_ease-out]">
+              {gameState.lastTransaction.type === 'CARD_GIVEN' ? (
+                <div className="text-center">
+                  <CheckCircle className="w-20 h-20 mx-auto mb-4 text-green-500 animate-[bounce_1s_ease-in-out_2]" />
+                  <h2 className="text-3xl font-bold text-green-600 mb-4">Card Transferred!</h2>
+                  <div className="flex items-center justify-center gap-6 mb-4">
+                    <div className="text-center">
+                      <div className="text-sm text-gray-600 mb-2">From</div>
+                      <div className="bg-red-100 px-6 py-3 rounded-xl font-bold text-lg">
+                        {players.find(p => p.id === gameState.lastTransaction.targetId)?.name}
+                      </div>
+                    </div>
+                    
+                    <ArrowRight className="w-8 h-8 text-gray-400 animate-[pulse_1s_ease-in-out_infinite]" />
+                    
+                    <div className="text-center">
+                      <div className="text-sm text-gray-600 mb-2">To</div>
+                      <div className="bg-green-100 px-6 py-3 rounded-xl font-bold text-lg">
+                        {players.find(p => p.id === gameState.lastTransaction.askerId)?.name}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="inline-block bg-gradient-to-br from-white to-gray-50 p-6 rounded-2xl shadow-xl border-4 border-yellow-400 animate-[spin_2s_ease-in-out_1]">
+                    {(() => {
+                      const display = getCardDisplay(gameState.lastTransaction.card);
+                      return (
+                        <div className="text-center">
+                          <div className={`text-5xl font-bold ${display.color}`}>
+                            {display.value}
+                          </div>
+                          <div className={`text-6xl ${display.color}`}>
+                            {display.symbol}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <XCircle className="w-20 h-20 mx-auto mb-4 text-red-500 animate-[shake_0.5s_ease-in-out_2]" />
+                  <h2 className="text-3xl font-bold text-red-600 mb-4">Card Not Found!</h2>
+                  <div className="flex items-center justify-center gap-6 mb-4">
+                    <div className="text-center">
+                      <div className="bg-blue-100 px-6 py-3 rounded-xl font-bold text-lg">
+                        {players.find(p => p.id === gameState.lastTransaction.askerId)?.name}
+                      </div>
+                      <div className="text-sm text-gray-600 mt-2">Asked</div>
+                    </div>
+                    
+                    <ArrowRight className="w-8 h-8 text-gray-400" />
+                    
+                    <div className="text-center">
+                      <div className="bg-gray-200 px-6 py-3 rounded-xl font-bold text-lg">
+                        {players.find(p => p.id === gameState.lastTransaction.targetId)?.name}
+                      </div>
+                      <div className="text-sm text-gray-600 mt-2">Doesn't have it</div>
+                    </div>
+                  </div>
+                  
+                  <div className="inline-block bg-gradient-to-br from-gray-200 to-gray-300 p-6 rounded-2xl shadow-xl opacity-50">
+                    {(() => {
+                      const display = getCardDisplay(gameState.lastTransaction.card);
+                      return (
+                        <div className="text-center">
+                          <div className={`text-5xl font-bold ${display.color}`}>
+                            {display.value}
+                          </div>
+                          <div className={`text-6xl ${display.color}`}>
+                            {display.symbol}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="bg-white/95 backdrop-blur rounded-2xl shadow-xl p-4 mb-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -339,6 +443,43 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
                 </div>
               )}
             </div>
+
+            {/* Last Transaction Display */}
+            {gameState.lastTransaction && (
+              <div className={`mb-4 p-4 rounded-xl border-2 ${
+                gameState.lastTransaction.type === 'CARD_GIVEN'
+                  ? 'bg-green-50 border-green-300'
+                  : 'bg-red-50 border-red-300'
+              }`}>
+                <div className="text-xs font-semibold mb-2 text-gray-600">Last Action:</div>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="font-semibold">
+                    {players.find(p => p.id === gameState.lastTransaction.askerId)?.name}
+                  </span>
+                  <ArrowRight size={16} className="text-gray-400" />
+                  <span className="font-semibold">
+                    {players.find(p => p.id === gameState.lastTransaction.targetId)?.name}
+                  </span>
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  {(() => {
+                    const display = getCardDisplay(gameState.lastTransaction.card);
+                    return (
+                      <div className="inline-flex items-center gap-2 bg-white px-3 py-1 rounded-lg">
+                        <span className={`text-lg font-bold ${display.color}`}>
+                          {display.value}{display.symbol}
+                        </span>
+                        {gameState.lastTransaction.type === 'CARD_GIVEN' ? (
+                          <CheckCircle size={16} className="text-green-600" />
+                        ) : (
+                          <XCircle size={16} className="text-red-600" />
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
 
             {isMyTurn && !gameState.isPaused && (
               <button
