@@ -1,6 +1,3 @@
-# ============================================================================
-# FILE: README.md (root)
-# ============================================================================
 # 🐟 Fish Card Game
 
 A real-time multiplayer strategic card game built with Next.js and Socket.IO.
