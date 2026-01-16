@@ -87,80 +87,6 @@ fish-card-game/
 - **Illegal Questions**: Turn switches to opponent if rules violated
 - **Failed Claims**: Opponent team gets the half-suit
 
-## 🌐 Deployment
-
-### Option 1: Vercel (Frontend) + Render (Backend)
-
-#### Deploy Backend to Render
-1. Push your code to GitHub
-2. Go to [Render.com](https://render.com)
-3. Create a new **Web Service**
-4. Connect your GitHub repository
-5. Configure:
-   - **Build Command**: `cd server && npm install`
-   - **Start Command**: `cd server && npm start`
-   - **Environment Variables**: Add `PORT`, `NODE_ENV`, `CORS_ORIGIN`
-6. Deploy!
-
-#### Deploy Frontend to Vercel
-1. Install Vercel CLI: `npm i -g vercel`
-2. In the `client` folder, run: `vercel`
-3. Follow the prompts
-4. Update `.env.local`:
-```
-   NEXT_PUBLIC_SOCKET_URL=https://your-render-app.onrender.com
-```
-5. Deploy: `vercel --prod`
-
-### Option 2: Railway (Full Stack)
-
-1. Push to GitHub
-2. Go to [Railway.app](https://railway.app)
-3. Create new project from GitHub repo
-4. Railway auto-detects both server and client
-5. Configure environment variables
-6. Deploy!
-
-### Option 3: Docker Deployment
-
-See `docker-compose.yml` for containerized deployment.
-
-## 🔧 Configuration
-
-### Server Environment Variables (.env)
-```env
-PORT=3001
-NODE_ENV=production
-CORS_ORIGIN=https://your-frontend-url.vercel.app
-```
-
-### Client Environment Variables (.env.local)
-```env
-NEXT_PUBLIC_SOCKET_URL=https://your-backend-url.onrender.com
-```
-
-## 🛠️ Development
-
-### Running Tests
-```bash
-# Server tests
-cd server
-npm test
-
-# Client tests
-cd client
-npm test
-```
-
-### Code Quality
-```bash
-# Linting
-npm run lint
-
-# Format code
-npm run format
-```
-
 ## 📝 API Documentation
 
 ### Socket.IO Events
@@ -191,20 +117,10 @@ Contributions are welcome! Please follow these steps:
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
 ## 🙏 Acknowledgments
 
 - Original Fish game from Bryn Mawr College's Distressing Math Collective
 - Built with Next.js, React, Socket.IO, and Tailwind CSS
 - Inspired by classic card games and strategic thinking
-
-## 📧 Contact
-
-For questions or support, please open an issue on GitHub.
-
----
 
 **Happy Playing! 🐟**
