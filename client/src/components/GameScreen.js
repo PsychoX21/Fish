@@ -583,32 +583,163 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
       {/* Instructions Modal */}
       {showInstructions && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-lg w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">How to Play</h2>
-              <button onClick={() => setShowInstructions(false)}>
-                <X size={20} />
+          <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-teal-600">🐟 How to Play Fish</h2>
+              <button 
+                onClick={() => setShowInstructions(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition"
+              >
+                <X size={24} />
               </button>
             </div>
 
-            <div className="space-y-3 text-sm">
-              <div className="bg-blue-50 p-3 rounded-lg">
-                <b>Asking</b>
-                <ol className="list-decimal list-inside text-xs mt-1">
-                  <li>Select an opponent</li>
-                  <li>Choose a card you don’t have</li>
-                  <li>You must own a card in that half-suit</li>
+            <div className="space-y-4">
+              {/* Objective */}
+              <div className="bg-gradient-to-r from-teal-50 to-emerald-50 p-4 rounded-xl border-l-4 border-teal-500">
+                <h3 className="font-bold text-lg mb-2 text-teal-800">🎯 Objective</h3>
+                <p className="text-sm text-gray-700">
+                  Work with your team to collect complete <strong>half-suits</strong> (6 cards each). 
+                  The team that correctly claims the most half-suits wins the game!
+                </p>
+              </div>
+
+              {/* Game Setup */}
+              <div className="bg-blue-50 p-4 rounded-xl border-l-4 border-blue-500">
+                <h3 className="font-bold text-lg mb-2 text-blue-800">🎴 What's a Half-Suit?</h3>
+                <p className="text-sm text-gray-700 mb-2">
+                  Each suit is split into two half-suits (8 total in the game):
+                </p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-white p-2 rounded">
+                    <span className="font-semibold">Low Cards:</span> 2, 3, 4, 5, 6, 7
+                  </div>
+                  <div className="bg-white p-2 rounded">
+                    <span className="font-semibold">High Cards:</span> 9, 10, J, Q, K, A
+                  </div>
+                </div>
+                <p className="text-xs text-gray-600 mt-2">
+                  <em>Note: All 8s are removed from the deck</em>
+                </p>
+              </div>
+
+              {/* Asking for Cards */}
+              <div className="bg-green-50 p-4 rounded-xl border-l-4 border-green-500">
+                <h3 className="font-bold text-lg mb-2 text-green-800">❓ Asking for Cards</h3>
+                <p className="text-sm text-gray-700 mb-2">On your turn:</p>
+                <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 ml-2">
+                  <li>
+                    <strong>Select an opponent</strong> from the other team
+                  </li>
+                  <li>
+                    <strong>Ask for a specific card</strong> you DON'T have (but you must have another card in that same half-suit)
+                  </li>
+                  <li>
+                    <strong>If they have it:</strong> They give it to you and you continue asking
+                  </li>
+                  <li>
+                    <strong>If they don't have it:</strong> Their turn begins
+                  </li>
                 </ol>
+                <div className="bg-white p-3 rounded-lg mt-3 text-xs border border-green-200">
+                  <strong className="text-green-700">Example:</strong> If you have the 2♥, you can ask for 3♥, 4♥, 5♥, 6♥, or 7♥ 
+                  (any other low hearts you don't have). You CANNOT ask for 2♥ (you have it) or 9♥ (different half-suit).
+                </div>
               </div>
 
-              <div className="bg-amber-50 p-3 rounded-lg text-xs">
-                <b>Claims:</b> You must know all 6 cards AND who owns them.
+              {/* Illegal Questions */}
+              <div className="bg-red-50 p-4 rounded-xl border-l-4 border-red-500">
+                <h3 className="font-bold text-lg mb-2 text-red-800">⚠️ Illegal Questions</h3>
+                <p className="text-sm text-gray-700 mb-2">Your question is <strong>illegal</strong> if you:</p>
+                <ul className="list-disc list-inside space-y-1 text-sm text-gray-700 ml-2">
+                  <li>Ask for a card you already have</li>
+                  <li>Ask for a card when you have NO cards in that half-suit</li>
+                  <li>Ask a teammate (must ask opponents only)</li>
+                </ul>
+                <p className="text-xs text-red-700 mt-2 font-semibold">
+                  Penalty: Your turn immediately ends and passes to the person you asked.
+                </p>
               </div>
 
-              <div className="bg-red-50 p-3 rounded-lg text-xs">
-                <b>No History Rule:</b> Card transfers are not logged.
+              {/* Making Claims */}
+              <div className="bg-amber-50 p-4 rounded-xl border-l-4 border-amber-500">
+                <h3 className="font-bold text-lg mb-2 text-amber-800">🏆 Making Claims</h3>
+                <p className="text-sm text-gray-700 mb-2">
+                  When you know the location of <strong>all 6 cards</strong> in a half-suit:
+                </p>
+                <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 ml-2">
+                  <li>Click "Make Claim" (only available during your team's turn)</li>
+                  <li>Select the half-suit you're claiming</li>
+                  <li>
+                    <strong>Choose which team</strong> has the cards:
+                    <ul className="list-disc list-inside ml-4 mt-1 text-xs">
+                      <li>Your team (most common)</li>
+                      <li>Opponent's team (if you tracked their cards!)</li>
+                    </ul>
+                  </li>
+                  <li>Assign each card to the correct player</li>
+                </ol>
+                <div className="bg-white p-3 rounded-lg mt-3 border border-amber-200">
+                  <p className="text-xs text-amber-900">
+                    <strong className="text-amber-700">✓ Correct Claim:</strong> Your team gets the half-suit!
+                  </p>
+                  <p className="text-xs text-amber-900 mt-1">
+                    <strong className="text-red-700">✗ Wrong Claim:</strong> The OTHER team gets the half-suit!
+                  </p>
+                </div>
+              </div>
+
+              {/* No History Rule */}
+              <div className="bg-purple-50 p-4 rounded-xl border-l-4 border-purple-500">
+                <h3 className="font-bold text-lg mb-2 text-purple-800">🧠 No History Rule</h3>
+                <p className="text-sm text-gray-700">
+                  Card transfers are <strong>NOT logged</strong> in the game log! Only illegal questions 
+                  and claims appear. You must remember:
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-sm text-gray-700 ml-2 mt-2">
+                  <li>Who asked for which cards</li>
+                  <li>Whether they received them</li>
+                  <li>What cards each player likely has</li>
+                </ul>
+                <p className="text-xs text-purple-700 mt-2 italic">
+                  💡 Pay close attention! Memory is your greatest asset.
+                </p>
+              </div>
+
+              {/* Pause Button */}
+              <div className="bg-gray-50 p-4 rounded-xl border-l-4 border-gray-400">
+                <h3 className="font-bold text-lg mb-2 text-gray-800">⏸️ Pause Button</h3>
+                <p className="text-sm text-gray-700">
+                  Only available during <strong>your team's turn</strong>. Use it to:
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-sm text-gray-700 ml-2 mt-2">
+                  <li>Think through card locations</li>
+                  <li>Recall previous questions</li>
+                  <li>Plan your strategy</li>
+                </ul>
+                <p className="text-xs text-gray-600 mt-2">
+                  Any teammate can pause or unpause the game.
+                </p>
+              </div>
+
+              {/* Strategy Tips */}
+              <div className="bg-indigo-50 p-4 rounded-xl border-l-4 border-indigo-500">
+                <h3 className="font-bold text-lg mb-2 text-indigo-800">💡 Pro Tips</h3>
+                <ul className="list-disc list-inside space-y-1 text-sm text-gray-700 ml-2">
+                  <li>Track which cards opponents ask for (they have cards in that half-suit!)</li>
+                  <li>Note when opponents DON'T have a card (helps narrow down locations)</li>
+                  <li>Coordinate with teammates - use the pause button to discuss strategy</li>
+                  <li>Only claim when you're 100% certain - wrong claims help the other team!</li>
+                </ul>
               </div>
             </div>
+
+            <button
+              onClick={() => setShowInstructions(false)}
+              className="w-full mt-6 bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-3 rounded-xl font-bold text-lg hover:shadow-lg transition"
+            >
+              Got it! Let's Play 🐟
+            </button>
           </div>
         </div>
       )}
