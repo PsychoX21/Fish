@@ -642,19 +642,80 @@ io.on('connection', (socket) => {
           }, RECONNECT_TIMEOUT);
 
         } else {
-          // No game in progress or no googleUid - just remove player
-          room.players.splice(playerIndex, 1);
+          // No googleUid - cannot reconnect
+          // But if game is in progress, redistribute cards immediately
+          if (room.gameState) {
+            const gameState = room.gameState;
+            const disconnectedCards = gameState.hands[player.id] || [];
+            delete gameState.hands[player.id];
 
-          if (room.players.length === 0) {
-            rooms.delete(code);
-            console.log(`Room ${code} deleted (empty)`);
-          } else {
+            // Get active players on the same team
+            const playerTeam = gameState.teams.A.includes(player.id) ? 'A' : 'B';
+            const activeTeammates = room.players.filter(p =>
+              p.id !== player.id &&
+              gameState.teams[playerTeam].includes(p.id)
+            );
+
+            // If no active teammates, distribute to all active players
+            const recipients = activeTeammates.length > 0
+              ? activeTeammates
+              : room.players.filter(p => p.id !== player.id);
+
+            // Redistribute cards evenly
+            if (recipients.length > 0 && disconnectedCards.length > 0) {
+              disconnectedCards.forEach((card, index) => {
+                const recipient = recipients[index % recipients.length];
+                if (!gameState.hands[recipient.id]) {
+                  gameState.hands[recipient.id] = [];
+                }
+                gameState.hands[recipient.id].push(card);
+              });
+            }
+
+            // Remove from teams
+            gameState.teams.A = gameState.teams.A.filter(id => id !== player.id);
+            gameState.teams.B = gameState.teams.B.filter(id => id !== player.id);
+
+            // Update current player if needed
+            if (gameState.currentPlayer === player.id) {
+              const remainingPlayers = room.players.filter(p => p.id !== player.id);
+              if (remainingPlayers.length > 0) {
+                gameState.currentPlayer = remainingPlayers[0].id;
+              }
+            }
+
+            // Remove player from room
+            room.players = room.players.filter(p => p.id !== player.id);
+
+            // Update host if needed
             if (socket.id === room.hostId && room.players.length > 0) {
               room.hostId = room.players[0].id;
               room.players[0].isHost = true;
             }
 
-            io.to(code).emit('PLAYER_LEFT', { room });
+            io.to(code).emit('CARDS_REDISTRIBUTED', {
+              room,
+              removedPlayerId: player.id,
+              removedPlayerName: player.name,
+              cardsRedistributed: disconnectedCards.length
+            });
+
+            console.log(`Cards redistributed immediately for non-logged-in player ${player.name} in room ${code}`);
+          } else {
+            // No game in progress - just remove player
+            room.players.splice(playerIndex, 1);
+
+            if (room.players.length === 0) {
+              rooms.delete(code);
+              console.log(`Room ${code} deleted (empty)`);
+            } else {
+              if (socket.id === room.hostId && room.players.length > 0) {
+                room.hostId = room.players[0].id;
+                room.players[0].isHost = true;
+              }
+
+              io.to(code).emit('PLAYER_LEFT', { room });
+            }
           }
         }
       }
