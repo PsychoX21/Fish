@@ -41,3 +41,6 @@ Thumbs.db
 
 # Misc
 *.pem
+
+# Firebase Admin SDK (sensitive credentials)
+*-firebase-adminsdk-*.json

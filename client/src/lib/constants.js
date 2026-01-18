@@ -26,3 +26,32 @@ export const getCardDisplay = (card) => ({
   color: SUIT_COLORS[card.suit],
   value: card.value
 });
+
+export const TEAM_COLORS = {
+  A: {
+    name: 'Red Team',
+    primary: 'text-red-600',
+    primaryDark: 'text-red-700',
+    bg: 'bg-red-50',
+    bgMedium: 'bg-red-100',
+    bgDark: 'bg-red-600',
+    border: 'border-red-500',
+    borderLight: 'border-red-300',
+    ring: 'ring-red-500',
+    gradient: 'from-red-600 to-rose-600',
+    avatar: 'bg-red-600'
+  },
+  B: {
+    name: 'Blue Team',
+    primary: 'text-blue-600',
+    primaryDark: 'text-blue-700',
+    bg: 'bg-blue-50',
+    bgMedium: 'bg-blue-100',
+    bgDark: 'bg-blue-600',
+    border: 'border-blue-500',
+    borderLight: 'border-blue-300',
+    ring: 'ring-blue-500',
+    gradient: 'from-blue-600 to-indigo-600',
+    avatar: 'bg-blue-600'
+  }
+};

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Users, Copy, Check, Play, Crown, AlertCircle } from 'lucide-react';
+import { TEAM_COLORS } from '../lib/constants';
 
 const LobbyScreen = ({ room, socket, onStartGame }) => {
   const [copied, setCopied] = useState(false);
@@ -11,9 +12,12 @@ const LobbyScreen = ({ room, socket, onStartGame }) => {
   };
 
   const isHost = room.players.find(p => p.id === socket?.id)?.isHost;
-  const canStart = room.players.length >= 4 && 
-                   room.players.length <= 10 && 
-                   room.players.length % 2 === 0;
+  const canStart = room.players.length >= 4 &&
+    room.players.length <= 10 &&
+    room.players.length % 2 === 0;
+
+  // Assign temporary visual teams for lobby display (alternating for preview)
+  const getPreviewTeam = (index) => index % 2 === 0 ? 'A' : 'B';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-800 to-cyan-900 p-4">
@@ -38,26 +42,45 @@ const LobbyScreen = ({ room, socket, onStartGame }) => {
               <Users className="text-teal-600" />
               <h3 className="text-xl font-semibold">Players ({room.players.length}/10)</h3>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              {room.players.map(player => (
-                <div
-                  key={player.id}
-                  className="bg-gradient-to-r from-teal-50 to-emerald-50 p-4 rounded-xl flex items-center gap-3"
-                >
-                  <div className="w-10 h-10 bg-teal-600 text-white rounded-full flex items-center justify-center font-bold">
-                    {player.name[0].toUpperCase()}
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-semibold">{player.name}</div>
-                    {player.isHost && (
-                      <div className="text-xs text-teal-600 flex items-center gap-1">
-                        <Crown size={12} /> Host
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+
+            {/* Team Preview */}
+            <div className="mb-4 flex justify-center gap-4 text-sm">
+              <div className={`flex items-center gap-2 px-3 py-1 rounded-lg ${TEAM_COLORS.A.bg} ${TEAM_COLORS.A.border} border-2`}>
+                <div className={`w-3 h-3 rounded-full ${TEAM_COLORS.A.bgDark}`}></div>
+                <span className={`font-semibold ${TEAM_COLORS.A.primary}`}>{TEAM_COLORS.A.name}</span>
+              </div>
+              <div className={`flex items-center gap-2 px-3 py-1 rounded-lg ${TEAM_COLORS.B.bg} ${TEAM_COLORS.B.border} border-2`}>
+                <div className={`w-3 h-3 rounded-full ${TEAM_COLORS.B.bgDark}`}></div>
+                <span className={`font-semibold ${TEAM_COLORS.B.primary}`}>{TEAM_COLORS.B.name}</span>
+              </div>
             </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {room.players.map((player, index) => {
+                const previewTeam = getPreviewTeam(index);
+                return (
+                  <div
+                    key={player.id}
+                    className={`bg-gradient-to-r ${previewTeam === 'A' ? 'from-red-50 to-rose-50 border-red-200' : 'from-blue-50 to-indigo-50 border-blue-200'} border-2 p-4 rounded-xl flex items-center gap-3`}
+                  >
+                    <div className={`w-10 h-10 ${TEAM_COLORS[previewTeam].avatar} text-white rounded-full flex items-center justify-center font-bold`}>
+                      {player.name[0].toUpperCase()}
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-semibold">{player.name}</div>
+                      {player.isHost && (
+                        <div className="text-xs text-teal-600 flex items-center gap-1">
+                          <Crown size={12} /> Host
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-xs text-gray-500 text-center mt-3 italic">
+              Teams will be randomly assigned when the game starts
+            </p>
           </div>
 
           {!canStart && (
