@@ -9,7 +9,9 @@ const {
   assignTeams,
   validateQuestion,
   validateClaim,
-  getHalfSuit
+  getHalfSuit,
+  LOW_CARDS,
+  HIGH_CARDS
 } = require('./gameLogic');
 
 const app = express();
