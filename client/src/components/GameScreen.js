@@ -546,7 +546,7 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
             </div>
 
             {/* Last Transaction Display */}
-            {gameState.lastTransaction && (
+            {gameState.lastTransaction && (gameState.lastTransaction.type === 'CARD_GIVEN' || gameState.lastTransaction.type === 'CARD_NOT_FOUND') && (
               <div className={`mb-4 p-4 rounded-xl border-2 ${gameState.lastTransaction.type === 'CARD_GIVEN'
                 ? 'bg-green-50 border-green-300'
                 : 'bg-red-50 border-red-300'
@@ -577,6 +577,25 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
                       </div>
                     );
                   })()}
+                </div>
+              </div>
+            )}
+
+            {/* Claim Transaction Display */}
+            {gameState.lastTransaction && (gameState.lastTransaction.type === 'CLAIM_SUCCESS' || gameState.lastTransaction.type === 'CLAIM_FAILED') && (
+              <div className={`mb-4 p-4 rounded-xl border-2 ${gameState.lastTransaction.type === 'CLAIM_SUCCESS'
+                ? 'bg-green-50 border-green-300'
+                : 'bg-red-50 border-red-300'
+                }`}>
+                <div className="text-xs font-semibold mb-2 text-gray-600">Last Claim:</div>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="font-semibold">
+                    {gameState.lastTransaction.halfSuit.replace('-', ' ').toUpperCase()}
+                  </span>
+                  <span className="text-gray-500">→</span>
+                  <span className={`font-bold ${gameState.lastTransaction.type === 'CLAIM_SUCCESS' ? 'text-green-600' : 'text-red-600'}`}>
+                    {gameState.lastTransaction.type === 'CLAIM_SUCCESS' ? `Team ${gameState.lastTransaction.awardedTeam} wins!` : `Team ${gameState.lastTransaction.awardedTeam} gets it!`}
+                  </span>
                 </div>
               </div>
             )}

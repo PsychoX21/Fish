@@ -78,9 +78,6 @@ const LobbyScreen = ({ room, socket, onStartGame }) => {
                 );
               })}
             </div>
-            <p className="text-xs text-gray-500 text-center mt-3 italic">
-              Teams will be randomly assigned when the game starts
-            </p>
           </div>
 
           {!canStart && (
