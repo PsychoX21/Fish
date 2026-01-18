@@ -227,7 +227,17 @@ io.on('connection', (socket) => {
     if (validation.isValid) {
       // Successful claim - award to the team that actually has the cards
       gameState.claimedHalfSuits[validation.actualTeam].push(halfSuit);
+
+      const [suit, type] = halfSuit.split('-');
+      const cardList = type === 'low' ? LOW_CARDS : HIGH_CARDS;
+      const claimedCardIds = cardList.map(value => `${value}-${suit}`);
       
+      Object.keys(gameState.hands).forEach(playerId => {
+        gameState.hands[playerId] = gameState.hands[playerId].filter(
+          card => !claimedCardIds.includes(card.id)
+        );
+      });
+
       gameState.gameLog.push({
         type: 'CLAIM_SUCCESS',
         playerId: socket.id,
@@ -236,6 +246,15 @@ io.on('connection', (socket) => {
         halfSuit,
         timestamp: Date.now()
       });
+
+      gameState.lastTransaction = {
+        type: 'CLAIM_SUCCESS',
+        playerId: socket.id,
+        claimerTeam,
+        awardedTeam: validation.actualTeam,
+        halfSuit,
+        timestamp: Date.now()
+      };
       
       const totalClaimed = gameState.claimedHalfSuits.A.length + gameState.claimedHalfSuits.B.length;
       if (totalClaimed === 8) {
@@ -247,6 +266,16 @@ io.on('connection', (socket) => {
       const beneficiaryTeam = claimerTeam === 'A' ? 'B' : 'A';
       gameState.claimedHalfSuits[beneficiaryTeam].push(halfSuit);
       
+      const [suit, type] = halfSuit.split('-');
+      const cardList = type === 'low' ? LOW_CARDS : HIGH_CARDS;
+      const claimedCardIds = cardList.map(value => `${value}-${suit}`);
+      
+      Object.keys(gameState.hands).forEach(playerId => {
+        gameState.hands[playerId] = gameState.hands[playerId].filter(
+          card => !claimedCardIds.includes(card.id)
+        );
+      });
+      
       gameState.gameLog.push({
         type: 'CLAIM_FAILED',
         playerId: socket.id,
@@ -255,6 +284,15 @@ io.on('connection', (socket) => {
         reason: validation.reason,
         timestamp: Date.now()
       });
+
+      gameState.lastTransaction = {
+        type: 'CLAIM_FAILED',
+        playerId: socket.id,
+        claimerTeam,
+        awardedTeam: beneficiaryTeam,
+        halfSuit,
+        timestamp: Date.now()
+      };
       
       const totalClaimed = gameState.claimedHalfSuits.A.length + gameState.claimedHalfSuits.B.length;
       if (totalClaimed === 8) {

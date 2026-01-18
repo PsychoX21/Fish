@@ -25,14 +25,23 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
       setShowTransactionAnimation(true);
       setPrevTransaction(gameState.lastTransaction);
       
-      // Hide animation after 4 seconds
+      // Hide animation after appropriate time
+      const duration = gameState.lastTransaction.type.startsWith('CLAIM') ? 5000 : 4000;
       const timer = setTimeout(() => {
         setShowTransactionAnimation(false);
-      }, 4000);
+      }, duration);
       
       return () => clearTimeout(timer);
     }
   }, [gameState.lastTransaction]);
+
+  useEffect(() => {
+    if (gameState.isPaused && showCardSelector) {
+      setShowCardSelector(false);
+      setSelectedCardToAsk(null);
+      setSelectedTarget(null);
+    }
+  }, [gameState.isPaused]);
   
   const getPlayerTeam = (playerId) => {
     return gameState.teams.A.includes(playerId) ? 'A' : 'B';
@@ -237,41 +246,42 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-800 to-cyan-900 p-4">
       <div className="max-w-7xl mx-auto">
-        {/* Transaction Animation Overlay */}
+        {/* Transaction/Claim Animation Overlay */}
         {showTransactionAnimation && gameState.lastTransaction && (
-          <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
-            <div className="bg-white/95 backdrop-blur-lg rounded-3xl shadow-2xl p-8 max-w-2xl w-full mx-4 animate-[slideIn_0.5s_ease-out]">
-              {gameState.lastTransaction.type === 'CARD_GIVEN' ? (
+          <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none p-4">
+            <div className="bg-white/95 backdrop-blur-lg rounded-3xl shadow-2xl p-6 sm:p-8 max-w-2xl w-full mx-4 animate-[slideIn_0.5s_ease-out]">
+              {/* Card Transfer Animations */}
+              {gameState.lastTransaction.type === 'CARD_GIVEN' && (
                 <div className="text-center">
-                  <CheckCircle className="w-20 h-20 mx-auto mb-4 text-green-500 animate-[bounce_1s_ease-in-out_2]" />
-                  <h2 className="text-3xl font-bold text-green-600 mb-4">Card Transferred!</h2>
-                  <div className="flex items-center justify-center gap-6 mb-4">
+                  <CheckCircle className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 text-green-500 animate-[bounce_1s_ease-in-out_2]" />
+                  <h2 className="text-2xl sm:text-3xl font-bold text-green-600 mb-4">Card Transferred!</h2>
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 mb-4">
                     <div className="text-center">
-                      <div className="text-sm text-gray-600 mb-2">From</div>
-                      <div className="bg-red-100 px-6 py-3 rounded-xl font-bold text-lg">
+                      <div className="text-xs sm:text-sm text-gray-600 mb-2">From</div>
+                      <div className="bg-red-100 px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-bold text-base sm:text-lg">
                         {players.find(p => p.id === gameState.lastTransaction.targetId)?.name}
                       </div>
                     </div>
                     
-                    <ArrowRight className="w-8 h-8 text-gray-400 animate-[pulse_1s_ease-in-out_infinite]" />
+                    <ArrowRight className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400 animate-[pulse_1s_ease-in-out_infinite] rotate-90 sm:rotate-0" />
                     
                     <div className="text-center">
-                      <div className="text-sm text-gray-600 mb-2">To</div>
-                      <div className="bg-green-100 px-6 py-3 rounded-xl font-bold text-lg">
+                      <div className="text-xs sm:text-sm text-gray-600 mb-2">To</div>
+                      <div className="bg-green-100 px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-bold text-base sm:text-lg">
                         {players.find(p => p.id === gameState.lastTransaction.askerId)?.name}
                       </div>
                     </div>
                   </div>
                   
-                  <div className="inline-block bg-gradient-to-br from-white to-gray-50 p-6 rounded-2xl shadow-xl border-4 border-yellow-400 animate-[spin_2s_ease-in-out_1]">
+                  <div className="inline-block bg-gradient-to-br from-white to-gray-50 p-4 sm:p-6 rounded-2xl shadow-xl border-4 border-yellow-400 animate-[spin_2s_ease-in-out_1]">
                     {(() => {
                       const display = getCardDisplay(gameState.lastTransaction.card);
                       return (
                         <div className="text-center">
-                          <div className={`text-5xl font-bold ${display.color}`}>
+                          <div className={`text-4xl sm:text-5xl font-bold ${display.color}`}>
                             {display.value}
                           </div>
-                          <div className={`text-6xl ${display.color}`}>
+                          <div className={`text-5xl sm:text-6xl ${display.color}`}>
                             {display.symbol}
                           </div>
                         </div>
@@ -279,43 +289,126 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
                     })()}
                   </div>
                 </div>
-              ) : (
+              )}
+
+              {gameState.lastTransaction.type === 'CARD_NOT_FOUND' && (
                 <div className="text-center">
-                  <XCircle className="w-20 h-20 mx-auto mb-4 text-red-500 animate-[shake_0.5s_ease-in-out_2]" />
-                  <h2 className="text-3xl font-bold text-red-600 mb-4">Card Not Found!</h2>
-                  <div className="flex items-center justify-center gap-6 mb-4">
+                  <XCircle className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 text-red-500 animate-[shake_0.5s_ease-in-out_2]" />
+                  <h2 className="text-2xl sm:text-3xl font-bold text-red-600 mb-4">Card Not Found!</h2>
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 mb-4">
                     <div className="text-center">
-                      <div className="bg-blue-100 px-6 py-3 rounded-xl font-bold text-lg">
+                      <div className="bg-blue-100 px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-bold text-base sm:text-lg">
                         {players.find(p => p.id === gameState.lastTransaction.askerId)?.name}
                       </div>
-                      <div className="text-sm text-gray-600 mt-2">Asked</div>
+                      <div className="text-xs sm:text-sm text-gray-600 mt-2">Asked</div>
                     </div>
                     
-                    <ArrowRight className="w-8 h-8 text-gray-400" />
+                    <ArrowRight className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400 rotate-90 sm:rotate-0" />
                     
                     <div className="text-center">
-                      <div className="bg-gray-200 px-6 py-3 rounded-xl font-bold text-lg">
+                      <div className="bg-gray-200 px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-bold text-base sm:text-lg">
                         {players.find(p => p.id === gameState.lastTransaction.targetId)?.name}
                       </div>
-                      <div className="text-sm text-gray-600 mt-2">Doesn't have it</div>
+                      <div className="text-xs sm:text-sm text-gray-600 mt-2">Doesn't have it</div>
                     </div>
                   </div>
                   
-                  <div className="inline-block bg-gradient-to-br from-gray-200 to-gray-300 p-6 rounded-2xl shadow-xl opacity-50">
+                  <div className="inline-block bg-gradient-to-br from-gray-200 to-gray-300 p-4 sm:p-6 rounded-2xl shadow-xl opacity-50">
                     {(() => {
                       const display = getCardDisplay(gameState.lastTransaction.card);
                       return (
                         <div className="text-center">
-                          <div className={`text-5xl font-bold ${display.color}`}>
+                          <div className={`text-4xl sm:text-5xl font-bold ${display.color}`}>
                             {display.value}
                           </div>
-                          <div className={`text-6xl ${display.color}`}>
+                          <div className={`text-5xl sm:text-6xl ${display.color}`}>
                             {display.symbol}
                           </div>
                         </div>
                       );
                     })()}
                   </div>
+                </div>
+              )}
+
+              {/* Successful Claim Animation */}
+              {gameState.lastTransaction.type === 'CLAIM_SUCCESS' && (
+                <div className="text-center">
+                  <div className="relative mb-6">
+                    <Trophy className="w-20 h-20 sm:w-24 sm:h-24 mx-auto text-yellow-500 animate-[bounce_1s_ease-in-out_3]" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-32 h-32 sm:w-40 sm:h-40 bg-yellow-400 rounded-full opacity-20 animate-ping"></div>
+                    </div>
+                  </div>
+                  
+                  <h2 className="text-2xl sm:text-4xl font-bold text-yellow-600 mb-2">
+                    Claim Successful! 🎉
+                  </h2>
+                  <p className="text-lg sm:text-xl text-gray-700 mb-6">
+                    <span className="font-bold text-teal-600">Team {gameState.lastTransaction.awardedTeam}</span> gets the half-suit!
+                  </p>
+                  
+                  <div className="bg-gradient-to-r from-yellow-50 to-amber-50 p-4 sm:p-6 rounded-2xl border-2 border-yellow-400 mb-4">
+                    <div className="text-xl sm:text-2xl font-bold text-amber-800 mb-3">
+                      {gameState.lastTransaction.halfSuit.replace('-', ' ').toUpperCase()}
+                    </div>
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {(() => {
+                        const [suit, type] = gameState.lastTransaction.halfSuit.split('-');
+                        const cardList = type === 'low' ? LOW_CARDS : HIGH_CARDS;
+                        return cardList.map((value, i) => {
+                          const display = getCardDisplay({ suit, value });
+                          return (
+                            <div 
+                              key={i} 
+                              className="bg-white p-2 sm:p-3 rounded-lg shadow-lg border-2 border-yellow-300 animate-[bounce_1s_ease-in-out]"
+                              style={{ animationDelay: `${i * 0.1}s` }}
+                            >
+                              <div className={`text-lg sm:text-xl font-bold ${display.color}`}>
+                                {value}{display.symbol}
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </div>
+                  
+                  {gameState.lastTransaction.claimerTeam !== gameState.lastTransaction.awardedTeam && (
+                    <p className="text-sm text-amber-700 italic">
+                      Claimed by Team {gameState.lastTransaction.claimerTeam} for Team {gameState.lastTransaction.awardedTeam}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Failed Claim Animation */}
+              {gameState.lastTransaction.type === 'CLAIM_FAILED' && (
+                <div className="text-center">
+                  <XCircle className="w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-4 text-red-500 animate-[shake_0.5s_ease-in-out_3]" />
+                  
+                  <h2 className="text-2xl sm:text-4xl font-bold text-red-600 mb-2">
+                    Claim Failed! ❌
+                  </h2>
+                  <p className="text-lg sm:text-xl text-gray-700 mb-6">
+                    <span className="font-bold text-red-600">Team {gameState.lastTransaction.claimerTeam}</span> made an incorrect claim
+                  </p>
+                  
+                  <div className="bg-gradient-to-r from-red-50 to-pink-50 p-4 sm:p-6 rounded-2xl border-2 border-red-400 mb-4">
+                    <div className="text-xl sm:text-2xl font-bold text-red-800 mb-3">
+                      {gameState.lastTransaction.halfSuit.replace('-', ' ').toUpperCase()}
+                    </div>
+                    <p className="text-sm sm:text-base text-red-700 mb-3">
+                      This half-suit now goes to...
+                    </p>
+                    <div className="bg-green-500 text-white text-2xl sm:text-3xl font-bold py-3 px-6 rounded-xl inline-block animate-[bounce_1s_ease-in-out_2]">
+                      Team {gameState.lastTransaction.awardedTeam}! 🎊
+                    </div>
+                  </div>
+                  
+                  <p className="text-xs sm:text-sm text-gray-600 italic">
+                    Incorrect claims give the half-suit to the other team!
+                  </p>
                 </div>
               )}
             </div>
