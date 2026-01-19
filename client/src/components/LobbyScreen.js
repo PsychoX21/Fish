@@ -22,12 +22,12 @@ const LobbyScreen = ({ room, socket, onStartGame }) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-800 to-cyan-900 p-4">
       <div className="max-w-4xl mx-auto">
-        <div className="bg-white/95 backdrop-blur rounded-3xl shadow-2xl p-8">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-800 mb-2">Game Lobby</h2>
-            <div className="inline-flex items-center gap-2 bg-gray-100 px-6 py-3 rounded-full">
+        <div className="bg-white/95 backdrop-blur rounded-3xl shadow-2xl p-4 sm:p-8">
+          <div className="text-center mb-6 sm:mb-8">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">Game Lobby</h2>
+            <div className="inline-flex items-center gap-2 bg-gray-100 px-4 sm:px-6 py-2 sm:py-3 rounded-full">
               <span className="text-gray-600">Room Code:</span>
-              <span className="font-mono text-2xl font-bold text-teal-600">{room.code}</span>
+              <span className="font-mono text-xl sm:text-2xl font-bold text-teal-600">{room.code}</span>
               <button
                 onClick={copyRoomCode}
                 className="ml-2 p-2 hover:bg-gray-200 rounded-lg transition"
@@ -55,7 +55,7 @@ const LobbyScreen = ({ room, socket, onStartGame }) => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {room.players.map((player, index) => {
                 const previewTeam = getPreviewTeam(index);
                 return (

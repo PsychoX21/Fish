@@ -58,9 +58,9 @@ const TeamSetupScreen = ({
                 <div className="bg-white/95 backdrop-blur rounded-3xl shadow-2xl p-6 md:p-8">
 
                     {/* Header */}
-                    <div className="text-center mb-6">
-                        <h2 className="text-3xl font-bold text-gray-800 mb-2">Team Setup</h2>
-                        <p className="text-gray-600">Review your teams and request swaps before starting</p>
+                    <div className="text-center mb-4 sm:mb-6">
+                        <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">Team Setup</h2>
+                        <p className="text-sm sm:text-base text-gray-600">Review your teams and request swaps before starting</p>
                     </div>
 
                     {/* Incoming Swap Request Alert */}
