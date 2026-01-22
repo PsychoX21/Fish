@@ -551,67 +551,71 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause, onLea
         )}
 
         {/* Header */}
-        <div className="bg-white/95 backdrop-blur rounded-2xl shadow-xl p-3 sm:p-4 mb-4 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2 sm:gap-4">
-            <div className="text-xl sm:text-2xl font-bold text-teal-600">🐟 FISH</div>
-            <div className={`text-xs sm:text-sm px-2 sm:px-3 py-1 rounded-lg ${TEAM_COLORS[myTeam].bgMedium} border-2 ${TEAM_COLORS[myTeam].border}`}>
-              <div className={`font-bold ${TEAM_COLORS[myTeam].primary}`}>{TEAM_COLORS[myTeam].name}</div>
-              <div className="text-xs text-gray-600">
-                Score: {gameState.claimedHalfSuits[myTeam].length}/8
+        <div className="bg-white/95 backdrop-blur rounded-2xl shadow-xl p-3 sm:p-4 mb-4">
+          {/* Top row: Title, Team, Actions */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="text-lg sm:text-2xl font-bold text-teal-600">🐟</div>
+              <div className={`text-xs px-2 py-1 rounded-lg ${TEAM_COLORS[myTeam].bgMedium} border ${TEAM_COLORS[myTeam].border}`}>
+                <span className={`font-bold ${TEAM_COLORS[myTeam].primary}`}>{TEAM_COLORS[myTeam].name}</span>
+                <span className="text-gray-600 ml-1">{gameState.claimedHalfSuits[myTeam].length}/8</span>
               </div>
             </div>
-            {/* Room Code - visible for reconnecting */}
-            <div className="text-xs bg-gray-100 px-2 py-1 rounded-lg">
-              <span className="text-gray-500">Code:</span>{' '}
-              <span className="font-mono font-bold text-teal-600">{room.code}</span>
+
+            <div className="flex items-center gap-1">
+              {gameState.isPaused && (
+                <div className="bg-amber-100 text-amber-800 px-2 py-1 rounded-full text-xs font-semibold">
+                  PAUSED
+                </div>
+              )}
+              {isMyTeamTurn && (
+                <button
+                  onClick={onTogglePause}
+                  className="w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-lg transition"
+                  title={gameState.isPaused ? "Unpause" : "Pause"}
+                >
+                  {gameState.isPaused ? <Play size={18} /> : <Pause size={18} />}
+                </button>
+              )}
+              <button
+                onClick={() => setShowInstructions(true)}
+                className="w-10 h-10 flex items-center justify-center bg-blue-100 hover:bg-blue-200 active:bg-blue-300 rounded-lg transition"
+                title="How to Play"
+              >
+                <AlertCircle size={18} />
+              </button>
+              {/* Declare Winner button for host when team has 5+ claims */}
+              {isHost && (gameState.claimedHalfSuits.A.length >= 5 || gameState.claimedHalfSuits.B.length >= 5) && (
+                <button
+                  onClick={() => {
+                    const winningTeam = gameState.claimedHalfSuits.A.length >= 5 ? 'A' : 'B';
+                    if (confirm(`End game and declare ${TEAM_COLORS[winningTeam].name} as winner?`)) {
+                      onDeclareWinner(winningTeam);
+                    }
+                  }}
+                  className="hidden sm:flex h-10 px-3 bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-lg font-semibold text-sm hover:shadow-lg transition items-center gap-1"
+                  title="End Game Early"
+                >
+                  <Trophy size={16} />
+                  End
+                </button>
+              )}
+              <button
+                onClick={onLeaveGame}
+                className="w-10 h-10 flex items-center justify-center bg-red-100 hover:bg-red-200 active:bg-red-300 text-red-600 rounded-lg transition"
+                title="Leave Game"
+              >
+                <LogOut size={18} />
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-1 sm:gap-2">
-            {gameState.isPaused && (
-              <div className="bg-amber-100 text-amber-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold">
-                PAUSED
-              </div>
-            )}
-            {isMyTeamTurn && (
-              <button
-                onClick={onTogglePause}
-                className="min-w-[44px] min-h-[44px] p-2 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-lg transition"
-                title={gameState.isPaused ? "Unpause" : "Pause"}
-              >
-                {gameState.isPaused ? <Play size={20} /> : <Pause size={20} />}
-              </button>
-            )}
-            <button
-              onClick={() => setShowInstructions(true)}
-              className="min-w-[44px] min-h-[44px] p-2 bg-blue-100 hover:bg-blue-200 active:bg-blue-300 rounded-lg transition"
-              title="How to Play"
-            >
-              <AlertCircle size={20} />
-            </button>
-            {/* Declare Winner button for host when team has 5+ claims */}
-            {isHost && (gameState.claimedHalfSuits.A.length >= 5 || gameState.claimedHalfSuits.B.length >= 5) && (
-              <button
-                onClick={() => {
-                  const winningTeam = gameState.claimedHalfSuits.A.length >= 5 ? 'A' : 'B';
-                  if (confirm(`End game and declare ${TEAM_COLORS[winningTeam].name} as winner?`)) {
-                    onDeclareWinner(winningTeam);
-                  }
-                }}
-                className="hidden sm:flex min-h-[44px] px-3 py-2 bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-lg font-semibold text-sm hover:shadow-lg transition items-center gap-1"
-                title="End Game Early"
-              >
-                <Trophy size={16} />
-                End Game
-              </button>
-            )}
-            <button
-              onClick={onLeaveGame}
-              className="min-w-[44px] min-h-[44px] p-2 bg-red-100 hover:bg-red-200 active:bg-red-300 text-red-600 rounded-lg transition"
-              title="Leave Game"
-            >
-              <LogOut size={20} />
-            </button>
+          {/* Bottom row: Room code */}
+          <div className="mt-2 flex items-center justify-center">
+            <div className="text-xs bg-gray-100 px-3 py-1 rounded-full">
+              <span className="text-gray-500">Room Code:</span>{' '}
+              <span className="font-mono font-bold text-teal-600">{room.code}</span>
+            </div>
           </div>
         </div>
 
