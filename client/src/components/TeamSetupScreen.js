@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeftRight, Check, X, Crown, Play, RefreshCw } from 'lucide-react';
+import { ArrowLeftRight, Check, X, Crown, Play, RefreshCw, ArrowLeft, LogOut } from 'lucide-react';
 import { TEAM_COLORS } from '../lib/constants';
 
 const TeamSetupScreen = ({
@@ -10,7 +10,9 @@ const TeamSetupScreen = ({
     onSendSwapRequest,
     onRespondSwapRequest,
     onConfirmTeams,
-    onRandomizeTeams
+    onRandomizeTeams,
+    onLeaveRoom,
+    onBackToLobby
 }) => {
     const [pendingSwap, setPendingSwap] = useState(null);
 
@@ -129,8 +131,20 @@ const TeamSetupScreen = ({
                                             className={`flex items-center justify-between p-3 rounded-xl bg-white/80 border ${isMe ? 'ring-2 ring-teal-500' : ''}`}
                                         >
                                             <div className="flex items-center gap-3">
-                                                <div className={`w-10 h-10 ${TEAM_COLORS.A.avatar} text-white rounded-full flex items-center justify-center font-bold`}>
-                                                    {player.name[0].toUpperCase()}
+                                                <div className={`w-10 h-10 ${TEAM_COLORS.A.avatar} text-white rounded-full flex items-center justify-center font-bold overflow-hidden`}>
+                                                    {player.photoURL ? (
+                                                        <img
+                                                            src={player.photoURL}
+                                                            alt={player.name}
+                                                            className="w-full h-full object-cover"
+                                                            onError={(e) => {
+                                                                e.target.style.display = 'none';
+                                                                e.target.parentElement.textContent = player.name[0].toUpperCase();
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        player.name[0].toUpperCase()
+                                                    )}
                                                 </div>
                                                 <div>
                                                     <div className="font-semibold flex items-center gap-2">
@@ -177,8 +191,20 @@ const TeamSetupScreen = ({
                                             className={`flex items-center justify-between p-3 rounded-xl bg-white/80 border ${isMe ? 'ring-2 ring-teal-500' : ''}`}
                                         >
                                             <div className="flex items-center gap-3">
-                                                <div className={`w-10 h-10 ${TEAM_COLORS.B.avatar} text-white rounded-full flex items-center justify-center font-bold`}>
-                                                    {player.name[0].toUpperCase()}
+                                                <div className={`w-10 h-10 ${TEAM_COLORS.B.avatar} text-white rounded-full flex items-center justify-center font-bold overflow-hidden`}>
+                                                    {player.photoURL ? (
+                                                        <img
+                                                            src={player.photoURL}
+                                                            alt={player.name}
+                                                            className="w-full h-full object-cover"
+                                                            onError={(e) => {
+                                                                e.target.style.display = 'none';
+                                                                e.target.parentElement.textContent = player.name[0].toUpperCase();
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        player.name[0].toUpperCase()
+                                                    )}
                                                 </div>
                                                 <div>
                                                     <div className="font-semibold flex items-center gap-2">
@@ -237,7 +263,7 @@ const TeamSetupScreen = ({
                     )}
 
                     {/* Actions */}
-                    <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="flex flex-col sm:flex-row gap-3 mb-3">
                         {isHost && (
                             <>
                                 <button
@@ -259,6 +285,33 @@ const TeamSetupScreen = ({
                                 Waiting for host to start the game...
                             </div>
                         )}
+                    </div>
+
+                    {/* Navigation buttons */}
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        {isHost && (
+                            <button
+                                onClick={onBackToLobby}
+                                className="flex-1 flex items-center justify-center gap-2 bg-amber-100 hover:bg-amber-200 text-amber-700 py-2.5 rounded-xl font-semibold transition"
+                            >
+                                <ArrowLeft size={18} /> Back to Lobby
+                            </button>
+                        )}
+                        <button
+                            onClick={() => {
+                                if (isHost) {
+                                    if (confirm('This will close the room for all players. Are you sure?')) {
+                                        onLeaveRoom();
+                                    }
+                                } else {
+                                    onLeaveRoom();
+                                }
+                            }}
+                            className="flex-1 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 rounded-xl font-semibold transition"
+                        >
+                            <LogOut size={18} />
+                            {isHost ? 'Close Room' : 'Leave Room'}
+                        </button>
                     </div>
 
                 </div>

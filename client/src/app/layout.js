@@ -1,19 +1,18 @@
 import './globals.css';
-import { AuthProvider } from '../contexts/AuthContext';
+import Providers from './Providers';
 
 export const metadata = {
   title: 'Fish Card Game',
   description: 'Strategic multiplayer card game',
-}
+};
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
-  )
+  );
 }
+

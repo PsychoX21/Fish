@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Wifi, WifiOff, Clock } from 'lucide-react';
+import { Wifi, WifiOff, Clock, UserX } from 'lucide-react';
 
-const DisconnectOverlay = ({ disconnectedPlayerName, timeout, onDismiss }) => {
+const DisconnectOverlay = ({ disconnectedPlayerName, timeout, onDismiss, isHost, onForceRedistribute }) => {
     const [timeLeft, setTimeLeft] = useState(Math.ceil(timeout / 1000));
 
     useEffect(() => {
@@ -51,9 +51,23 @@ const DisconnectOverlay = ({ disconnectedPlayerName, timeout, onDismiss }) => {
                     </div>
                 </div>
 
-                <p className="text-xs sm:text-sm text-gray-500">
+                <p className="text-xs sm:text-sm text-gray-500 mb-4">
                     Game is paused. If they don't reconnect in time, their cards will be redistributed.
                 </p>
+
+                {isHost && onForceRedistribute && (
+                    <button
+                        onClick={() => {
+                            if (confirm(`Remove ${disconnectedPlayerName} and redistribute their cards now?`)) {
+                                onForceRedistribute();
+                            }
+                        }}
+                        className="w-full bg-gradient-to-r from-red-500 to-pink-500 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition flex items-center justify-center gap-2"
+                    >
+                        <UserX size={20} />
+                        Force Redistribute & Continue
+                    </button>
+                )}
             </div>
         </div>
     );

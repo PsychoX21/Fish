@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Play, Pause, Trophy, AlertCircle, X, ArrowRight, CheckCircle, XCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Play, Pause, Trophy, AlertCircle, X, ArrowRight, CheckCircle, XCircle, LogOut, RotateCcw, UserPlus, Home, UserCheck } from 'lucide-react';
 import Card from './Card';
 import { getHalfSuit, SUITS, LOW_CARDS, HIGH_CARDS, getCardDisplay, TEAM_COLORS } from '../lib/constants';
+import { useAuth } from '../contexts/AuthContext';
+import { recordGame, sendFriendRequest, getFriends } from '../lib/ProfileService';
 
-const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => {
+const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause, onLeaveGame, onPlayAgain, onDeclareWinner }) => {
   const [selectedTarget, setSelectedTarget] = useState(null);
   const [showCardSelector, setShowCardSelector] = useState(false);
   const [selectedCardToAsk, setSelectedCardToAsk] = useState(null);
@@ -34,6 +36,11 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
       return () => clearTimeout(timer);
     }
   }, [gameState.lastTransaction]);
+
+  // Function to skip transaction animation
+  const skipTransactionAnimation = () => {
+    setShowTransactionAnimation(false);
+  };
 
   useEffect(() => {
     if (gameState.isPaused && showCardSelector) {
@@ -143,7 +150,15 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
     setClaimTargetTeam(team);
     const dist = {};
     const teamMembers = gameState.teams[team];
-    teamMembers.forEach(pid => dist[pid] = []);
+    teamMembers.forEach(pid => {
+      // Auto-populate my own cards matching the selected half-suit
+      if (pid === socket.id && claimHalfSuit && team === myTeam) {
+        const myCardsForHalfSuit = myHand.filter(card => getHalfSuit(card) === claimHalfSuit);
+        dist[pid] = myCardsForHalfSuit;
+      } else {
+        dist[pid] = [];
+      }
+    });
     setClaimDistribution(dist);
   };
 
@@ -218,15 +233,85 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
     }));
   };
 
+  const { user, isAuthenticated } = useAuth();
+  const recordedRoomRef = useRef(null); // Track which room was recorded to prevent duplicates
+  const [sentFriendRequests, setSentFriendRequests] = useState(new Set());
+  const [friendsList, setFriendsList] = useState([]);
+  const isHost = room?.players?.find(p => p.id === socket.id)?.isHost;
+
+  // Load friends list once when component mounts
+  useEffect(() => {
+    if (isAuthenticated && user?.uid) {
+      getFriends(user.uid)
+        .then(friends => setFriendsList(friends.map(f => f.id)))
+        .catch(err => console.error('Error loading friends:', err));
+    }
+  }, [isAuthenticated, user?.uid]);
+
+  // Helper to check if a player is a friend
+  const isFriend = (playerGoogleUid) => friendsList.includes(playerGoogleUid);
+
+  // Handler for sending friend requests to other logged-in players
+  const handleSendFriendRequest = async (targetPlayer) => {
+    if (!isAuthenticated || !targetPlayer.googleUid) return;
+
+    try {
+      await sendFriendRequest(user.uid, targetPlayer.googleUid);
+      setSentFriendRequests(prev => new Set([...prev, targetPlayer.googleUid]));
+      alert(`Friend request sent to ${targetPlayer.name}!`);
+    } catch (err) {
+      console.error('Error sending friend request:', err);
+      alert('Failed to send friend request');
+    }
+  };
+
+  // Record game history when game ends (use ref to prevent double recording)
+  // Only record if authenticated user is playing
+  useEffect(() => {
+    // Create unique game identifier using room code + winner + scores
+    const gameId = gameState.gameOver
+      ? `${room.code}-${gameState.winner}-${gameState.claimedHalfSuits.A.length}-${gameState.claimedHalfSuits.B.length}`
+      : null;
+
+    // Only record if:
+    // 1. Game is over
+    // 2. Haven't recorded this specific game yet
+    // 3. User is authenticated AND is the host (only host records to prevent duplicates)
+    if (gameState.gameOver && gameId && recordedRoomRef.current !== gameId && isAuthenticated && user?.uid && isHost) {
+      recordedRoomRef.current = gameId;
+      // Record game with current players
+      const playersWithTeams = players.map(p => ({
+        id: p.id,
+        name: p.name,
+        team: gameState.teams.A.includes(p.id) ? 'A' : 'B',
+        googleUid: p.googleUid
+      }));
+
+      recordGame({
+        roomCode: room.code,
+        players: playersWithTeams,
+        teamAScore: gameState.claimedHalfSuits.A.length,
+        teamBScore: gameState.claimedHalfSuits.B.length,
+        winner: gameState.winner
+      }).catch(err => console.error('Error recording game:', err));
+    }
+  }, [gameState.gameOver, room.code, players, gameState.teams, gameState.claimedHalfSuits, gameState.winner, isAuthenticated, user?.uid, isHost]);
+
   if (gameState.gameOver) {
     const winnerTeam = gameState.winner;
+    const myTeam = gameState.teams.A.includes(socket.id) ? 'A' : 'B';
+    const didWin = myTeam === winnerTeam;
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-800 to-cyan-900 flex items-center justify-center p-4">
         <div className="bg-white/95 backdrop-blur rounded-3xl shadow-2xl p-8 max-w-2xl w-full text-center">
           <Trophy className={`w-24 h-24 mx-auto mb-6 ${TEAM_COLORS[winnerTeam].primary}`} />
-          <h1 className={`text-4xl font-bold mb-4 ${TEAM_COLORS[winnerTeam].primary}`}>
+          <h1 className={`text-4xl font-bold mb-2 ${TEAM_COLORS[winnerTeam].primary}`}>
             {TEAM_COLORS[winnerTeam].name} Wins!
           </h1>
+          <p className={`text-lg mb-6 ${didWin ? 'text-green-600' : 'text-gray-600'}`}>
+            {didWin ? '🎉 Congratulations!' : 'Better luck next time!'}
+          </p>
           <div className="text-2xl mb-8 flex items-center justify-center gap-4">
             <span className={`font-bold ${TEAM_COLORS.A.primary}`}>
               {TEAM_COLORS.A.name}: {gameState.claimedHalfSuits.A.length}
@@ -236,12 +321,42 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
               {TEAM_COLORS.B.name}: {gameState.claimedHalfSuits.B.length}
             </span>
           </div>
-          <button
-            onClick={() => window.location.reload()}
-            className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-8 py-3 rounded-xl font-bold text-lg hover:shadow-lg transition"
-          >
-            Play Again
-          </button>
+
+          {isHost ? (
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                onClick={onPlayAgain}
+                className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-8 py-3 rounded-xl font-bold text-lg hover:shadow-lg transition flex items-center justify-center gap-2"
+              >
+                <RotateCcw size={20} />
+                Play Again
+              </button>
+              <button
+                onClick={onLeaveGame}
+                className="bg-gray-200 text-gray-700 px-8 py-3 rounded-xl font-bold text-lg hover:bg-gray-300 transition flex items-center justify-center gap-2"
+              >
+                <Home size={20} />
+                Go Home
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-3">
+              <p className="text-gray-500">Waiting for host to start next game...</p>
+              <button
+                onClick={onLeaveGame}
+                className="bg-gray-200 text-gray-700 px-6 py-2 rounded-xl font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-2"
+              >
+                <Home size={18} />
+                Leave & Go Home
+              </button>
+            </div>
+          )}
+
+          {isAuthenticated && (
+            <p className="text-sm text-gray-400 mt-4">
+              ✓ Game saved to your profile
+            </p>
+          )}
         </div>
       </div>
     );
@@ -254,8 +369,22 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
       <div className="max-w-7xl mx-auto">
         {/* Transaction/Claim Animation Overlay */}
         {showTransactionAnimation && gameState.lastTransaction && (
-          <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none p-4">
-            <div className="bg-white/95 backdrop-blur-lg rounded-3xl shadow-2xl p-6 sm:p-8 max-w-2xl w-full mx-4 animate-[slideIn_0.5s_ease-out]">
+          <div
+            className="fixed inset-0 flex items-center justify-center z-50 bg-black/30 p-4"
+            onClick={skipTransactionAnimation}
+          >
+            <div
+              className="bg-white/95 backdrop-blur-lg rounded-3xl shadow-2xl p-6 sm:p-8 max-w-2xl w-full mx-4 animate-[slideIn_0.5s_ease-out] relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Skip button */}
+              <button
+                onClick={skipTransactionAnimation}
+                className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-lg transition z-10"
+                title="Skip animation"
+              >
+                <X size={24} className="text-gray-600" />
+              </button>
               {/* Card Transfer Animations */}
               {gameState.lastTransaction.type === 'CARD_GIVEN' && (
                 <div className="text-center">
@@ -351,7 +480,7 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
                     Claim Successful! 🎉
                   </h2>
                   <p className="text-lg sm:text-xl text-gray-700 mb-6">
-                    <span className="font-bold text-teal-600">Team {gameState.lastTransaction.awardedTeam}</span> gets the half-suit!
+                    <span className="font-bold text-teal-600">{TEAM_COLORS[gameState.lastTransaction.awardedTeam].name}</span> gets the half-suit!
                   </p>
 
                   <div className="bg-gradient-to-r from-yellow-50 to-amber-50 p-4 sm:p-6 rounded-2xl border-2 border-yellow-400 mb-4">
@@ -382,7 +511,7 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
 
                   {gameState.lastTransaction.claimerTeam !== gameState.lastTransaction.awardedTeam && (
                     <p className="text-sm text-amber-700 italic">
-                      Claimed by Team {gameState.lastTransaction.claimerTeam} for Team {gameState.lastTransaction.awardedTeam}
+                      Claimed by {TEAM_COLORS[gameState.lastTransaction.claimerTeam].name} for {TEAM_COLORS[gameState.lastTransaction.awardedTeam].name}
                     </p>
                   )}
                 </div>
@@ -397,7 +526,7 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
                     Claim Failed! ❌
                   </h2>
                   <p className="text-lg sm:text-xl text-gray-700 mb-6">
-                    <span className="font-bold text-red-600">Team {gameState.lastTransaction.claimerTeam}</span> made an incorrect claim
+                    <span className="font-bold text-red-600">{TEAM_COLORS[gameState.lastTransaction.claimerTeam].name}</span> made an incorrect claim
                   </p>
 
                   <div className="bg-gradient-to-r from-red-50 to-pink-50 p-4 sm:p-6 rounded-2xl border-2 border-red-400 mb-4">
@@ -408,7 +537,7 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
                       This half-suit now goes to...
                     </p>
                     <div className="bg-green-500 text-white text-2xl sm:text-3xl font-bold py-3 px-6 rounded-xl inline-block animate-[bounce_1s_ease-in-out_2]">
-                      Team {gameState.lastTransaction.awardedTeam}! 🎊
+                      {TEAM_COLORS[gameState.lastTransaction.awardedTeam].name}! 🎊
                     </div>
                   </div>
 
@@ -455,6 +584,29 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
             >
               <AlertCircle size={20} />
             </button>
+            {/* Declare Winner button for host when team has 5+ claims */}
+            {isHost && (gameState.claimedHalfSuits.A.length >= 5 || gameState.claimedHalfSuits.B.length >= 5) && (
+              <button
+                onClick={() => {
+                  const winningTeam = gameState.claimedHalfSuits.A.length >= 5 ? 'A' : 'B';
+                  if (confirm(`End game and declare ${TEAM_COLORS[winningTeam].name} as winner?`)) {
+                    onDeclareWinner(winningTeam);
+                  }
+                }}
+                className="px-3 py-2 bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-lg font-semibold text-sm hover:shadow-lg transition flex items-center gap-1"
+                title="End Game Early"
+              >
+                <Trophy size={16} />
+                End Game
+              </button>
+            )}
+            <button
+              onClick={onLeaveGame}
+              className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition"
+              title="Leave Game"
+            >
+              <LogOut size={20} />
+            </button>
           </div>
         </div>
 
@@ -464,8 +616,25 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
 
             {/* You */}
             <div className={`mb-4 ${TEAM_COLORS[myTeam].bg} p-3 rounded-xl border-2 ${TEAM_COLORS[myTeam].border}`}>
-              <div className={`font-semibold ${TEAM_COLORS[myTeam].primaryDark}`}>
-                {players.find(p => p.id === socket.id)?.name} (You)
+              <div className="flex items-center gap-2 mb-2">
+                <div className={`w-10 h-10 ${TEAM_COLORS[myTeam].avatar} text-white rounded-full flex items-center justify-center font-bold overflow-hidden flex-shrink-0`}>
+                  {myPlayer?.photoURL ? (
+                    <img
+                      src={myPlayer.photoURL}
+                      alt={myPlayer.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.parentElement.textContent = myPlayer.name[0].toUpperCase();
+                      }}
+                    />
+                  ) : (
+                    myPlayer?.name[0].toUpperCase()
+                  )}
+                </div>
+                <div className={`font-semibold ${TEAM_COLORS[myTeam].primaryDark}`}>
+                  {players.find(p => p.id === socket.id)?.name} (You)
+                </div>
               </div>
               <div className="text-xs text-gray-600">
                 {myHand.length} cards
@@ -483,15 +652,59 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
               <div className="space-y-2">
                 {teammates.map(player => (
                   <div key={player.id} className={`text-sm ${TEAM_COLORS[myTeam].bg} p-3 rounded-lg border ${TEAM_COLORS[myTeam].borderLight}`}>
-                    <div className="font-medium">{player.name}</div>
-                    <div className="text-xs text-gray-600">
-                      {gameState.hands[player.id].length} cards
-                    </div>
-                    {gameState.currentPlayer === player.id && (
-                      <div className="text-xs text-green-600 font-semibold mt-1">
-                        Current Turn
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-8 h-8 ${TEAM_COLORS[myTeam].avatar} text-white rounded-full flex items-center justify-center font-bold text-xs overflow-hidden flex-shrink-0`}>
+                          {player.photoURL ? (
+                            <img
+                              src={player.photoURL}
+                              alt={player.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.parentElement.textContent = player.name[0].toUpperCase();
+                              }}
+                            />
+                          ) : (
+                            player.name[0].toUpperCase()
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-medium">{player.name}</div>
+                          <div className="text-xs text-gray-600">
+                            {gameState.hands[player.id]?.length ?? 0} cards
+                          </div>
+                          {gameState.currentPlayer === player.id && (
+                            <div className="text-xs text-green-600 font-semibold mt-1">
+                              Current Turn
+                            </div>
+                          )}
+                        </div>
+                        {/* Add Friend button for logged-in players */}
+                        {isAuthenticated && player.googleUid && player.googleUid !== user?.uid && (
+                          <>
+                            {isFriend(player.googleUid) ? (
+                              <span className="p-1.5 text-green-600" title="Friend">
+                                <UserCheck size={16} />
+                              </span>
+                            ) : sentFriendRequests.has(player.googleUid) ? (
+                              <span className="text-xs text-green-600">✓ Sent</span>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSendFriendRequest(player);
+                                }}
+                                className="p-1.5 text-teal-600 hover:bg-teal-100 rounded-lg transition"
+                                title="Add Friend"
+                              >
+                                <UserPlus size={16} />
+                              </button>
+                            )}
+                          </>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -505,25 +718,71 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
               <div className="space-y-2">
                 {opponents.map(player => {
                   const opponentTeam = myTeam === 'A' ? 'B' : 'A';
+                  const opponentCardCount = gameState.hands[player.id]?.length ?? 0;
+                  const cannotSelect = !isMyTurn || gameState.isPaused || opponentCardCount === 0;
                   return (
                     <button
                       key={player.id}
                       onClick={() => setSelectedTarget(player.id)}
-                      disabled={!isMyTurn || gameState.isPaused}
+                      disabled={cannotSelect}
                       className={`w-full p-3 rounded-xl text-left transition ${selectedTarget === player.id
                         ? `${TEAM_COLORS[opponentTeam].bgMedium} border-2 ${TEAM_COLORS[opponentTeam].border}`
                         : `${TEAM_COLORS[opponentTeam].bg} hover:${TEAM_COLORS[opponentTeam].bgMedium} border-2 ${TEAM_COLORS[opponentTeam].borderLight}`
-                        } ${!isMyTurn || gameState.isPaused ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        } ${cannotSelect ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                      <div className="font-semibold">{player.name}</div>
-                      <div className="text-xs text-gray-600">
-                        {gameState.hands[player.id].length} cards
-                      </div>
-                      {gameState.currentPlayer === player.id && (
-                        <div className="text-xs text-green-600 font-semibold mt-1">
-                          Current Turn
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-8 h-8 ${TEAM_COLORS[opponentTeam].avatar} text-white rounded-full flex items-center justify-center font-bold text-xs overflow-hidden flex-shrink-0`}>
+                            {player.photoURL ? (
+                              <img
+                                src={player.photoURL}
+                                alt={player.name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                  e.target.parentElement.textContent = player.name[0].toUpperCase();
+                                }}
+                              />
+                            ) : (
+                              player.name[0].toUpperCase()
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-semibold">{player.name}</div>
+                            <div className="text-xs text-gray-600">
+                              {gameState.hands[player.id]?.length ?? 0} cards
+                            </div>
+                            {gameState.currentPlayer === player.id && (
+                              <div className="text-xs text-green-600 font-semibold mt-1">
+                                Current Turn
+                              </div>
+                            )}
+                          </div>
+                          {/* Add Friend button for logged-in opponents */}
+                          {isAuthenticated && player.googleUid && player.googleUid !== user?.uid && (
+                            <>
+                              {isFriend(player.googleUid) ? (
+                                <span className="p-1.5 text-green-600" title="Friend">
+                                  <UserCheck size={16} />
+                                </span>
+                              ) : sentFriendRequests.has(player.googleUid) ? (
+                                <span className="text-xs text-green-600">✓ Sent</span>
+                              ) : (
+                                <div
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSendFriendRequest(player);
+                                  }}
+                                  className="p-1.5 text-teal-600 hover:bg-teal-100 rounded-lg transition cursor-pointer"
+                                  title="Add Friend"
+                                >
+                                  <UserPlus size={16} />
+                                </div>
+                              )}
+                            </>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </button>
                   );
                 })}
@@ -594,7 +853,7 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
                   </span>
                   <span className="text-gray-500">→</span>
                   <span className={`font-bold ${gameState.lastTransaction.type === 'CLAIM_SUCCESS' ? 'text-green-600' : 'text-red-600'}`}>
-                    {gameState.lastTransaction.type === 'CLAIM_SUCCESS' ? `Team ${gameState.lastTransaction.awardedTeam} wins!` : `Team ${gameState.lastTransaction.awardedTeam} gets it!`}
+                    {gameState.lastTransaction.type === 'CLAIM_SUCCESS' ? `${TEAM_COLORS[gameState.lastTransaction.awardedTeam].name} wins!` : `${TEAM_COLORS[gameState.lastTransaction.awardedTeam].name} gets it!`}
                   </span>
                 </div>
               </div>
@@ -627,13 +886,13 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
                     )}
                     {log.type === 'CLAIM_SUCCESS' && (
                       <span className="text-green-600 font-semibold">
-                        ✓ Team {log.targetTeam} claimed {log.halfSuit}!
-                        {log.claimerTeam !== log.targetTeam && ` (claimed by Team ${log.claimerTeam})`}
+                        ✓ {TEAM_COLORS[log.targetTeam].name} claimed {log.halfSuit}!
+                        {log.claimerTeam !== log.targetTeam && ` (claimed by ${TEAM_COLORS[log.claimerTeam].name})`}
                       </span>
                     )}
                     {log.type === 'CLAIM_FAILED' && (
                       <span className="text-red-600 font-semibold">
-                        ✗ Failed claim on {log.halfSuit} by Team {log.claimerTeam}
+                        ✗ Failed claim on {log.halfSuit} by {TEAM_COLORS[log.claimerTeam].name}
                       </span>
                     )}
                   </div>
@@ -688,7 +947,6 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
                       <Card
                         key={card.id}
                         card={card}
-                        disabled={!isMyTurn || gameState.isPaused}
                       />
                     ))}
                   </div>
@@ -977,7 +1235,13 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
                   if (claimTargetTeam) {
                     const dist = {};
                     gameState.teams[claimTargetTeam].forEach(pid => {
-                      dist[pid] = [];
+                      // Auto-populate my own cards matching the selected half-suit
+                      if (pid === socket.id && hs && claimTargetTeam === myTeam) {
+                        const myCardsForHalfSuit = myHand.filter(card => getHalfSuit(card) === hs);
+                        dist[pid] = myCardsForHalfSuit;
+                      } else {
+                        dist[pid] = [];
+                      }
                     });
                     setClaimDistribution(dist);
                   }
@@ -1005,7 +1269,7 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                     }`}
                 >
-                  Team A {myTeam === 'A' && '(Your Team)'}
+                  {TEAM_COLORS.A.name} {myTeam === 'A' && '(Your Team)'}
                 </button>
                 <button
                   onClick={() => handleTargetTeamChange('B')}
@@ -1014,7 +1278,7 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause }) => 
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                     }`}
                 >
-                  Team B {myTeam === 'B' && '(Your Team)'}
+                  {TEAM_COLORS.B.name} {myTeam === 'B' && '(Your Team)'}
                 </button>
               </div>
             </div>

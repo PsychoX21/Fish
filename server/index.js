@@ -27,6 +27,8 @@ const io = socketIO(server, {
 
 const rooms = new Map();
 const disconnectedPlayers = new Map(); // Track disconnected players by googleUid
+const onlineUsers = new Map(); // Track online users by googleUid -> socketId
+const pendingInvites = new Map(); // Track pending invites by targetUid
 const RECONNECT_TIMEOUT = 60000; // 60 seconds
 
 const generateRoomCode = () => {
@@ -37,10 +39,34 @@ const getPlayerTeam = (gameState, playerId) => {
   return gameState.teams.A.includes(playerId) ? 'A' : 'B';
 };
 
+// Helper to create a serializable version of room (excludes non-serializable fields like timers)
+const getSafeRoom = (room) => {
+  if (!room) return null;
+
+  // Create a clean copy without non-serializable fields
+  const safeRoom = {
+    code: room.code,
+    hostId: room.hostId,
+    players: room.players ? room.players.map(p => ({
+      id: p.id,
+      name: p.name,
+      isHost: p.isHost,
+      googleUid: p.googleUid || null,
+      photoURL: p.photoURL || null,
+      disconnected: p.disconnected || false
+    })) : [],
+    gameState: room.gameState ? JSON.parse(JSON.stringify(room.gameState)) : null,
+    teamSetup: room.teamSetup ? JSON.parse(JSON.stringify(room.teamSetup)) : null
+  };
+
+  return safeRoom;
+};
+
 io.on('connection', (socket) => {
   console.log(`Player connected: ${socket.id}`);
 
-  socket.on('CREATE_ROOM', ({ playerName, googleUid }) => {
+  socket.on('CREATE_ROOM', ({ playerName, googleUid, photoURL }) => {
+    console.log('[DEBUG] CREATE_ROOM - photoURL received:', photoURL);
     const code = generateRoomCode();
 
     const room = {
@@ -50,6 +76,7 @@ io.on('connection', (socket) => {
         name: playerName,
         isHost: true,
         googleUid: googleUid || null,
+        photoURL: photoURL || null,
         disconnected: false
       }],
       gameState: null,
@@ -60,11 +87,12 @@ io.on('connection', (socket) => {
     rooms.set(code, room);
     socket.join(code);
 
-    socket.emit('ROOM_CREATED', { code, room });
+    socket.emit('ROOM_CREATED', { code, room: getSafeRoom(room) });
     console.log(`Room created: ${code} by ${playerName}`);
   });
 
-  socket.on('JOIN_ROOM', ({ code, playerName, googleUid }) => {
+  socket.on('JOIN_ROOM', ({ code, playerName, googleUid, photoURL }) => {
+    console.log('[DEBUG] JOIN_ROOM - photoURL received:', photoURL);
     const room = rooms.get(code);
 
     if (!room) {
@@ -72,26 +100,28 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Check if this is a reconnecting player (by googleUid)
-    if (googleUid && room.gameState) {
-      const disconnectedPlayer = room.players.find(
-        p => p.googleUid === googleUid && p.disconnected
-      );
+    // Check if this player is already in the room (by googleUid or by socket id)
+    const existingPlayerByUid = googleUid ? room.players.find(p => p.googleUid === googleUid) : null;
+    const existingPlayerBySocket = room.players.find(p => p.id === socket.id);
 
-      if (disconnectedPlayer) {
-        // Clear timeout
-        if (room.disconnectTimers[disconnectedPlayer.id]) {
-          clearTimeout(room.disconnectTimers[disconnectedPlayer.id]);
-          delete room.disconnectTimers[disconnectedPlayer.id];
-        }
+    // If player with same googleUid exists, handle reconnection
+    if (existingPlayerByUid) {
+      // Clear any pending disconnect timer
+      if (room.disconnectTimers[existingPlayerByUid.id]) {
+        clearTimeout(room.disconnectTimers[existingPlayerByUid.id]);
+        delete room.disconnectTimers[existingPlayerByUid.id];
+      }
 
-        const oldId = disconnectedPlayer.id;
+      const oldId = existingPlayerByUid.id;
 
-        // Update player id to new socket
-        disconnectedPlayer.id = socket.id;
-        disconnectedPlayer.disconnected = false;
+      // Update player id to new socket
+      existingPlayerByUid.id = socket.id;
+      existingPlayerByUid.disconnected = false;
+      // Update photo URL in case it changed
+      if (photoURL) existingPlayerByUid.photoURL = photoURL;
 
-        // Update gameState references
+      // If game is in progress, update gameState references
+      if (room.gameState) {
         if (room.gameState.hands[oldId]) {
           room.gameState.hands[socket.id] = room.gameState.hands[oldId];
           delete room.gameState.hands[oldId];
@@ -106,19 +136,46 @@ io.on('connection', (socket) => {
           room.gameState.currentPlayer = socket.id;
         }
 
-        socket.join(code);
-
-        io.to(code).emit('PLAYER_RECONNECTED', { room, reconnectedPlayerId: socket.id });
-        console.log(`${playerName} reconnected to room ${code}`);
-        return;
+        // Unpause game if it was paused for this player
+        if (room.gameState.isPaused && room.gameState.disconnectedPlayer?.id === oldId) {
+          room.gameState.isPaused = false;
+          room.gameState.pausedBy = null;
+          delete room.gameState.disconnectedPlayer;
+        }
       }
+
+      socket.join(code);
+
+      // Emit to all players that someone reconnected
+      io.to(code).emit('PLAYER_RECONNECTED', { room: getSafeRoom(room), reconnectedPlayerId: socket.id });
+
+      // Also emit directly to the reconnecting player so they navigate to the correct screen
+      if (room.gameState) {
+        socket.emit('GAME_REJOINED', { room: getSafeRoom(room) });
+      } else if (room.teamSetup) {
+        socket.emit('ROOM_JOINED', { room: getSafeRoom(room) });
+      } else {
+        socket.emit('ROOM_JOINED', { room: getSafeRoom(room) });
+      }
+
+      console.log(`${playerName} reconnected to room ${code}`);
+      return;
     }
 
+    // If player socket already in room, ignore
+    if (existingPlayerBySocket) {
+      console.log(`Player ${socket.id} already in room ${code}`);
+      socket.emit('ROOM_JOINED', { room: getSafeRoom(room) });
+      return;
+    }
+
+    // Check room capacity
     if (room.players.length >= 10) {
       socket.emit('ERROR', { message: 'Room is full' });
       return;
     }
 
+    // Check if game in progress (new players can't join mid-game)
     if (room.gameState) {
       socket.emit('ERROR', { message: 'Game already in progress' });
       return;
@@ -129,13 +186,14 @@ io.on('connection', (socket) => {
       name: playerName,
       isHost: false,
       googleUid: googleUid || null,
+      photoURL: photoURL || null,
       disconnected: false
     };
 
     room.players.push(player);
     socket.join(code);
 
-    io.to(code).emit('PLAYER_JOINED', { room });
+    io.to(code).emit('PLAYER_JOINED', { room: getSafeRoom(room) });
     console.log(`${playerName} joined room ${code}`);
   });
 
@@ -169,7 +227,7 @@ io.on('connection', (socket) => {
       nextRequestId: 1
     };
 
-    io.to(code).emit('TEAMS_ASSIGNED', { room });
+    io.to(code).emit('TEAMS_ASSIGNED', { room: getSafeRoom(room) });
     console.log(`Teams assigned in room ${code}`);
   });
 
@@ -191,7 +249,7 @@ io.on('connection', (socket) => {
     room.teamSetup.teams = assignTeams(playerIds);
     room.teamSetup.swapRequests = []; // Clear pending requests
 
-    io.to(code).emit('TEAMS_UPDATED', { room });
+    io.to(code).emit('TEAMS_UPDATED', { room: getSafeRoom(room) });
     console.log(`Teams randomized in room ${code}`);
   });
 
@@ -233,7 +291,7 @@ io.on('connection', (socket) => {
 
     room.teamSetup.swapRequests.push(request);
 
-    io.to(code).emit('SWAP_REQUEST_SENT', { room, request });
+    io.to(code).emit('SWAP_REQUEST_SENT', { room: getSafeRoom(room), request });
     console.log(`Swap request sent in room ${code}`);
   });
 
@@ -288,7 +346,7 @@ io.on('connection', (socket) => {
       request.status = 'declined';
     }
 
-    io.to(code).emit('SWAP_RESPONSE_RESULT', { room, request, accepted: accept });
+    io.to(code).emit('SWAP_RESPONSE_RESULT', { room: getSafeRoom(room), request, accepted: accept });
     console.log(`Swap request ${accept ? 'accepted' : 'declined'} in room ${code}`);
   });
 
@@ -331,7 +389,7 @@ io.on('connection', (socket) => {
     // Clear team setup state
     delete room.teamSetup;
 
-    io.to(code).emit('GAME_STARTED', { room });
+    io.to(code).emit('GAME_STARTED', { room: getSafeRoom(room) });
     console.log(`Game started in room ${code}`);
   });
 
@@ -374,7 +432,7 @@ io.on('connection', (socket) => {
       });
 
       gameState.currentPlayer = targetId;
-      io.to(code).emit('GAME_STATE_UPDATE', { room });
+      io.to(code).emit('GAME_STATE_UPDATE', { room: getSafeRoom(room) });
       return;
     }
 
@@ -404,7 +462,7 @@ io.on('connection', (socket) => {
     }
 
     gameState.lastQuestion = { askerId: socket.id, targetId, card };
-    io.to(code).emit('GAME_STATE_UPDATE', { room });
+    io.to(code).emit('GAME_STATE_UPDATE', { room: getSafeRoom(room) });
   });
 
   socket.on('MAKE_CLAIM', ({ code, halfSuit, distribution, targetTeam }) => {
@@ -503,7 +561,7 @@ io.on('connection', (socket) => {
       }
     }
 
-    io.to(code).emit('GAME_STATE_UPDATE', { room });
+    io.to(code).emit('GAME_STATE_UPDATE', { room: getSafeRoom(room) });
   });
 
   // CORRECTED: Pause only during your team's turn
@@ -535,11 +593,395 @@ io.on('connection', (socket) => {
       gameState.pausedBy = socket.id;
     }
 
-    io.to(code).emit('GAME_STATE_UPDATE', { room });
+    io.to(code).emit('GAME_STATE_UPDATE', { room: getSafeRoom(room) });
+  });
+
+  // Declare winner early (when one team has 5+ claims)
+  socket.on('DECLARE_WINNER', ({ code, winningTeam }) => {
+    const room = rooms.get(code);
+
+    if (!room || !room.gameState) {
+      socket.emit('ERROR', { message: 'Game not found' });
+      return;
+    }
+
+    // Only host can declare winner
+    if (room.hostId !== socket.id) {
+      socket.emit('ERROR', { message: 'Only host can declare winner' });
+      return;
+    }
+
+    const gameState = room.gameState;
+
+    // Check that the winning team actually has 5+ claims
+    if (gameState.claimedHalfSuits[winningTeam].length < 5) {
+      socket.emit('ERROR', { message: 'Team must have 5+ claims to declare winner' });
+      return;
+    }
+
+    gameState.gameOver = true;
+    gameState.winner = winningTeam;
+
+    io.to(code).emit('GAME_STATE_UPDATE', { room: getSafeRoom(room) });
+    console.log(`Game in room ${code} ended early: Team ${winningTeam} declared winner by host`);
+  });
+
+  // ====== NAVIGATION EVENTS ======
+
+  // Leave room (lobby or team setup)
+  socket.on('LEAVE_ROOM', ({ code }) => {
+    const room = rooms.get(code);
+
+    if (!room) {
+      socket.emit('ERROR', { message: 'Room not found' });
+      return;
+    }
+
+    const playerIndex = room.players.findIndex(p => p.id === socket.id);
+    if (playerIndex === -1) return;
+
+    const player = room.players[playerIndex];
+    const wasHost = player.isHost;
+
+    // Remove player from room
+    room.players.splice(playerIndex, 1);
+    socket.leave(code);
+
+    // If host leaves, close the room entirely
+    if (wasHost) {
+      io.to(code).emit('ROOM_CLOSED', {
+        reason: 'Host left the room',
+        hostName: player.name
+      });
+      rooms.delete(code);
+      console.log(`Room ${code} closed (host left)`);
+    } else if (room.players.length === 0) {
+      rooms.delete(code);
+      console.log(`Room ${code} deleted (empty)`);
+    } else {
+      io.to(code).emit('PLAYER_LEFT', { room: getSafeRoom(room) });
+      console.log(`${player.name} left room ${code}`);
+    }
+
+    socket.emit('LEFT_ROOM');
+  });
+
+  // Leave game (during active gameplay)
+  socket.on('LEAVE_GAME', ({ code }) => {
+    const room = rooms.get(code);
+
+    if (!room || !room.gameState) {
+      socket.emit('ERROR', { message: 'Invalid game state' });
+      return;
+    }
+
+    const playerIndex = room.players.findIndex(p => p.id === socket.id);
+    if (playerIndex === -1) return;
+
+    const player = room.players[playerIndex];
+    const gameState = room.gameState;
+
+    // If game is already over, just remove player without redistribution
+    if (gameState.gameOver) {
+      room.players.splice(playerIndex, 1);
+      socket.leave(code);
+      socket.emit('LEFT_ROOM');
+      io.to(code).emit('GAME_STATE_UPDATE', { room: getSafeRoom(room) });
+      return;
+    }
+
+    // Get player's cards and redistribute to ALL active players
+    const disconnectedCards = gameState.hands[player.id] || [];
+    delete gameState.hands[player.id];
+
+    // Get ALL active players (not just teammates)
+    const recipients = room.players.filter(p => p.id !== player.id);
+
+    // Redistribute cards
+    if (recipients.length > 0 && disconnectedCards.length > 0) {
+      disconnectedCards.forEach((card, index) => {
+        const recipient = recipients[index % recipients.length];
+        if (!gameState.hands[recipient.id]) {
+          gameState.hands[recipient.id] = [];
+        }
+        gameState.hands[recipient.id].push(card);
+      });
+    }
+
+    // Remove from teams
+    gameState.teams.A = gameState.teams.A.filter(id => id !== player.id);
+    gameState.teams.B = gameState.teams.B.filter(id => id !== player.id);
+
+    // Update current player if needed
+    if (gameState.currentPlayer === player.id) {
+      const remainingPlayers = room.players.filter(p => p.id !== player.id);
+      if (remainingPlayers.length > 0) {
+        gameState.currentPlayer = remainingPlayers[0].id;
+      }
+    }
+
+    // Remove player from room
+    room.players = room.players.filter(p => p.id !== player.id);
+    socket.leave(code);
+
+    // Update host if needed
+    if (socket.id === room.hostId && room.players.length > 0) {
+      room.hostId = room.players[0].id;
+      room.players[0].isHost = true;
+    }
+
+    // Check if one team has no players left - other team wins
+    const activeTeamA = room.players.filter(p => gameState.teams.A.includes(p.id));
+    const activeTeamB = room.players.filter(p => gameState.teams.B.includes(p.id));
+
+    if (activeTeamA.length === 0 && activeTeamB.length > 0) {
+      // Team B wins - Team A has no players
+      gameState.gameOver = true;
+      gameState.winner = 'B';
+      io.to(code).emit('GAME_STATE_UPDATE', { room: getSafeRoom(room) });
+      console.log(`Game ended in room ${code}: Team B wins (Team A left)`);
+    } else if (activeTeamB.length === 0 && activeTeamA.length > 0) {
+      // Team A wins - Team B has no players
+      gameState.gameOver = true;
+      gameState.winner = 'A';
+      io.to(code).emit('GAME_STATE_UPDATE', { room: getSafeRoom(room) });
+      console.log(`Game ended in room ${code}: Team A wins (Team B left)`);
+    } else {
+      io.to(code).emit('PLAYER_LEFT_GAME', {
+        room: getSafeRoom(room),
+        leftPlayerId: player.id,
+        leftPlayerName: player.name,
+        cardsRedistributed: disconnectedCards.length
+      });
+    }
+
+    socket.emit('LEFT_ROOM');
+    console.log(`${player.name} left game in room ${code}`);
+  });
+
+  // Back to lobby (host only, from team setup)
+  socket.on('BACK_TO_LOBBY', ({ code }) => {
+    const room = rooms.get(code);
+
+    if (!room) {
+      socket.emit('ERROR', { message: 'Room not found' });
+      return;
+    }
+
+    if (socket.id !== room.hostId) {
+      socket.emit('ERROR', { message: 'Only host can go back to lobby' });
+      return;
+    }
+
+    // Clear any team setup state but keep players
+    room.gameState = null;
+
+    io.to(code).emit('BACK_TO_LOBBY', { room: getSafeRoom(room) });
+    console.log(`Room ${code} returned to lobby by host`);
+  });
+
+  // Play again after game ends (host only)
+  socket.on('PLAY_AGAIN', ({ code }) => {
+    const room = rooms.get(code);
+
+    if (!room) {
+      socket.emit('ERROR', { message: 'Room not found' });
+      return;
+    }
+
+    if (socket.id !== room.hostId) {
+      socket.emit('ERROR', { message: 'Only host can start play again' });
+      return;
+    }
+
+    // Reset game state and team setup, keep players
+    room.gameState = null;
+    room.teamSetup = null;
+
+    // Reset player disconnected states
+    room.players.forEach(p => {
+      p.disconnected = false;
+    });
+
+    // Clear any pending disconnect timers
+    Object.keys(room.disconnectTimers).forEach(key => {
+      clearTimeout(room.disconnectTimers[key]);
+    });
+    room.disconnectTimers = {};
+
+    io.to(code).emit('PLAY_AGAIN', { room: getSafeRoom(room) });
+    console.log(`Play again initiated in room ${code}`);
+  });
+
+  // ====== ONLINE PRESENCE & INVITES ======
+
+  // Register user for online presence tracking
+  socket.on('REGISTER_USER', ({ googleUid }) => {
+    if (googleUid) {
+      onlineUsers.set(googleUid, socket.id);
+      console.log(`User ${googleUid} registered online`);
+    }
+  });
+
+  // Send game invite to a friend
+  socket.on('INVITE_TO_GAME', ({ targetUid, roomCode, fromName }) => {
+    const targetSocketId = onlineUsers.get(targetUid);
+
+    if (!targetSocketId) {
+      socket.emit('INVITE_FAILED', {
+        reason: 'User is not online',
+        targetUid
+      });
+      return;
+    }
+
+    // Store pending invite
+    pendingInvites.set(targetUid, {
+      roomCode,
+      fromName,
+      fromSocketId: socket.id,
+      timestamp: Date.now()
+    });
+
+    // Send invite to target
+    io.to(targetSocketId).emit('GAME_INVITE', {
+      roomCode,
+      fromName
+    });
+
+    socket.emit('INVITE_SENT', { targetUid });
+    console.log(`Game invite sent to ${targetUid} for room ${roomCode}`);
+  });
+
+  // Handle invite response
+  socket.on('INVITE_RESPONSE', ({ roomCode, accepted, googleUid }) => {
+    const invite = pendingInvites.get(googleUid);
+
+    if (invite) {
+      pendingInvites.delete(googleUid);
+
+      if (accepted && invite.fromSocketId) {
+        io.to(invite.fromSocketId).emit('INVITE_ACCEPTED', {
+          targetUid: googleUid
+        });
+      }
+    }
+  });
+
+  // Host can force redistribute disconnected player's cards
+  socket.on('FORCE_REDISTRIBUTE', ({ code }) => {
+    const room = rooms.get(code);
+
+    if (!room || !room.gameState) {
+      socket.emit('ERROR', { message: 'Invalid game state' });
+      return;
+    }
+
+    if (socket.id !== room.hostId) {
+      socket.emit('ERROR', { message: 'Only host can force redistribute' });
+      return;
+    }
+
+    const gameState = room.gameState;
+    const disconn = gameState.disconnectedPlayer;
+
+    if (!disconn) {
+      socket.emit('ERROR', { message: 'No disconnected player to redistribute' });
+      return;
+    }
+
+    // Find the disconnected player
+    const player = room.players.find(p => p.id === disconn.id);
+    if (!player) return;
+
+    // Clear the disconnect timer
+    if (room.disconnectTimers[player.id]) {
+      clearTimeout(room.disconnectTimers[player.id]);
+      delete room.disconnectTimers[player.id];
+    }
+
+    // Redistribute cards
+    const disconnectedCards = gameState.hands[player.id] || [];
+    delete gameState.hands[player.id];
+
+    // Get ALL active players (not just teammates)
+    const recipients = room.players.filter(p => !p.disconnected && p.id !== player.id);
+
+    // Redistribute cards evenly
+    if (recipients.length > 0 && disconnectedCards.length > 0) {
+      disconnectedCards.forEach((card, index) => {
+        const recipient = recipients[index % recipients.length];
+        if (!gameState.hands[recipient.id]) {
+          gameState.hands[recipient.id] = [];
+        }
+        gameState.hands[recipient.id].push(card);
+      });
+    }
+
+    // Remove from teams
+    gameState.teams.A = gameState.teams.A.filter(id => id !== player.id);
+    gameState.teams.B = gameState.teams.B.filter(id => id !== player.id);
+
+    // Update current player if needed
+    if (gameState.currentPlayer === player.id) {
+      const activePlayers = room.players.filter(p => !p.disconnected && p.id !== player.id);
+      if (activePlayers.length > 0) {
+        gameState.currentPlayer = activePlayers[0].id;
+      }
+    }
+
+    // Remove player from room
+    room.players = room.players.filter(p => p.id !== player.id);
+
+    // Unpause game
+    gameState.isPaused = false;
+    gameState.pausedBy = null;
+    delete gameState.disconnectedPlayer;
+
+    // Update host if needed
+    if (socket.id === room.hostId && room.players.length > 0) {
+      room.hostId = room.players[0].id;
+      room.players[0].isHost = true;
+    }
+
+    // Check team-leave win condition
+    const activeTeamA = room.players.filter(p => !p.disconnected && gameState.teams.A.includes(p.id));
+    const activeTeamB = room.players.filter(p => !p.disconnected && gameState.teams.B.includes(p.id));
+
+    if (activeTeamA.length === 0 && activeTeamB.length > 0) {
+      gameState.gameOver = true;
+      gameState.winner = 'B';
+      io.to(code).emit('GAME_STATE_UPDATE', { room: getSafeRoom(room) });
+      console.log(`Game ended in room ${code}: Team B wins (Team A left via force redistribute)`);
+    } else if (activeTeamB.length === 0 && activeTeamA.length > 0) {
+      gameState.gameOver = true;
+      gameState.winner = 'A';
+      io.to(code).emit('GAME_STATE_UPDATE', { room: getSafeRoom(room) });
+      console.log(`Game ended in room ${code}: Team A wins (Team B left via force redistribute)`);
+    } else {
+      io.to(code).emit('CARDS_REDISTRIBUTED', {
+        room: getSafeRoom(room),
+        removedPlayerId: player.id,
+        removedPlayerName: player.name,
+        cardsRedistributed: disconnectedCards.length
+      });
+    }
+
+    console.log(`Host force redistributed cards for ${player.name} in room ${code}`);
   });
 
   socket.on('disconnect', () => {
     console.log(`Player disconnected: ${socket.id}`);
+
+    // Remove from online users tracking
+    onlineUsers.forEach((socketId, uid) => {
+      if (socketId === socket.id) {
+        onlineUsers.delete(uid);
+        // Also clean up any pending invites for this user
+        pendingInvites.delete(uid);
+        console.log(`User ${uid} went offline`);
+      }
+    });
 
     rooms.forEach((room, code) => {
       const playerIndex = room.players.findIndex(p => p.id === socket.id);
@@ -548,9 +990,21 @@ io.on('connection', (socket) => {
         const player = room.players[playerIndex];
 
         // If game is in progress and player has googleUid, allow reconnection
-        if (room.gameState && player.googleUid) {
+        // But skip if game is already over - just remove player
+        if (room.gameState && player.googleUid && !room.gameState.gameOver) {
           // Mark player as disconnected but don't remove
           player.disconnected = true;
+
+          // Transfer host immediately if disconnected player was host
+          if (player.id === room.hostId) {
+            const activePlayers = room.players.filter(p => !p.disconnected && p.id !== player.id);
+            if (activePlayers.length > 0) {
+              room.hostId = activePlayers[0].id;
+              activePlayers[0].isHost = true;
+              player.isHost = false;
+              console.log(`Host transferred from ${player.name} to ${activePlayers[0].name} in room ${code}`);
+            }
+          }
 
           // Pause game for reconnection
           room.gameState.isPaused = true;
@@ -562,7 +1016,7 @@ io.on('connection', (socket) => {
           };
 
           io.to(code).emit('PLAYER_DISCONNECTED', {
-            room,
+            room: getSafeRoom(room),
             disconnectedPlayerId: player.id,
             disconnectedPlayerName: player.name,
             timeout: RECONNECT_TIMEOUT
@@ -578,21 +1032,19 @@ io.on('connection', (socket) => {
             const gameState = room.gameState;
             if (!gameState) return;
 
+            // If game is already over, just remove player without redistribution
+            if (gameState.gameOver) {
+              room.players = room.players.filter(p => p.id !== player.id);
+              delete room.disconnectTimers[player.id];
+              io.to(code).emit('GAME_STATE_UPDATE', { room: getSafeRoom(room) });
+              return;
+            }
+
             const disconnectedCards = gameState.hands[player.id] || [];
             delete gameState.hands[player.id];
 
-            // Get active players on the same team
-            const playerTeam = gameState.teams.A.includes(player.id) ? 'A' : 'B';
-            const activeTeammates = room.players.filter(p =>
-              !p.disconnected &&
-              p.id !== player.id &&
-              gameState.teams[playerTeam].includes(p.id)
-            );
-
-            // If no active teammates, distribute to all active players
-            const recipients = activeTeammates.length > 0
-              ? activeTeammates
-              : room.players.filter(p => !p.disconnected && p.id !== player.id);
+            // Get ALL active players (not just teammates)
+            const recipients = room.players.filter(p => !p.disconnected && p.id !== player.id);
 
             // Redistribute cards evenly
             if (recipients.length > 0 && disconnectedCards.length > 0) {
@@ -633,12 +1085,30 @@ io.on('connection', (socket) => {
 
             delete room.disconnectTimers[player.id];
 
-            io.to(code).emit('CARDS_REDISTRIBUTED', {
-              room,
-              removedPlayerId: player.id,
-              removedPlayerName: player.name,
-              cardsRedistributed: disconnectedCards.length
-            });
+            // Check if one team has no active players left - other team wins
+            const activeTeamA = room.players.filter(p => !p.disconnected && gameState.teams.A.includes(p.id));
+            const activeTeamB = room.players.filter(p => !p.disconnected && gameState.teams.B.includes(p.id));
+
+            if (activeTeamA.length === 0 && activeTeamB.length > 0) {
+              // Team B wins - Team A has no players
+              gameState.gameOver = true;
+              gameState.winner = 'B';
+              io.to(code).emit('GAME_STATE_UPDATE', { room: getSafeRoom(room) });
+              console.log(`Game ended in room ${code}: Team B wins (Team A has no players)`);
+            } else if (activeTeamB.length === 0 && activeTeamA.length > 0) {
+              // Team A wins - Team B has no players
+              gameState.gameOver = true;
+              gameState.winner = 'A';
+              io.to(code).emit('GAME_STATE_UPDATE', { room: getSafeRoom(room) });
+              console.log(`Game ended in room ${code}: Team A wins (Team B has no players)`);
+            } else {
+              io.to(code).emit('CARDS_REDISTRIBUTED', {
+                room: getSafeRoom(room),
+                removedPlayerId: player.id,
+                removedPlayerName: player.name,
+                cardsRedistributed: disconnectedCards.length
+              });
+            }
 
             console.log(`Cards redistributed for ${player.name} in room ${code}`);
           }, RECONNECT_TIMEOUT);
@@ -648,20 +1118,19 @@ io.on('connection', (socket) => {
           // But if game is in progress, redistribute cards immediately
           if (room.gameState) {
             const gameState = room.gameState;
+
+            // If game is already over, just remove player without redistribution
+            if (gameState.gameOver) {
+              room.players.splice(playerIndex, 1);
+              io.to(code).emit('GAME_STATE_UPDATE', { room: getSafeRoom(room) });
+              return;
+            }
+
             const disconnectedCards = gameState.hands[player.id] || [];
             delete gameState.hands[player.id];
 
-            // Get active players on the same team
-            const playerTeam = gameState.teams.A.includes(player.id) ? 'A' : 'B';
-            const activeTeammates = room.players.filter(p =>
-              p.id !== player.id &&
-              gameState.teams[playerTeam].includes(p.id)
-            );
-
-            // If no active teammates, distribute to all active players
-            const recipients = activeTeammates.length > 0
-              ? activeTeammates
-              : room.players.filter(p => p.id !== player.id);
+            // Get ALL active players (not just teammates)
+            const recipients = room.players.filter(p => p.id !== player.id);
 
             // Redistribute cards evenly
             if (recipients.length > 0 && disconnectedCards.length > 0) {
@@ -695,12 +1164,30 @@ io.on('connection', (socket) => {
               room.players[0].isHost = true;
             }
 
-            io.to(code).emit('CARDS_REDISTRIBUTED', {
-              room,
-              removedPlayerId: player.id,
-              removedPlayerName: player.name,
-              cardsRedistributed: disconnectedCards.length
-            });
+            // Check if one team has no players left - other team wins
+            const activeTeamA = room.players.filter(p => gameState.teams.A.includes(p.id));
+            const activeTeamB = room.players.filter(p => gameState.teams.B.includes(p.id));
+
+            if (activeTeamA.length === 0 && activeTeamB.length > 0) {
+              // Team B wins - Team A has no players
+              gameState.gameOver = true;
+              gameState.winner = 'B';
+              io.to(code).emit('GAME_STATE_UPDATE', { room: getSafeRoom(room) });
+              console.log(`Game ended in room ${code}: Team B wins (Team A disconnected)`);
+            } else if (activeTeamB.length === 0 && activeTeamA.length > 0) {
+              // Team A wins - Team B has no players
+              gameState.gameOver = true;
+              gameState.winner = 'A';
+              io.to(code).emit('GAME_STATE_UPDATE', { room: getSafeRoom(room) });
+              console.log(`Game ended in room ${code}: Team A wins (Team B disconnected)`);
+            } else {
+              io.to(code).emit('CARDS_REDISTRIBUTED', {
+                room: getSafeRoom(room),
+                removedPlayerId: player.id,
+                removedPlayerName: player.name,
+                cardsRedistributed: disconnectedCards.length
+              });
+            }
 
             console.log(`Cards redistributed immediately for non-logged-in player ${player.name} in room ${code}`);
           } else {
@@ -716,7 +1203,7 @@ io.on('connection', (socket) => {
                 room.players[0].isHost = true;
               }
 
-              io.to(code).emit('PLAYER_LEFT', { room });
+              io.to(code).emit('PLAYER_LEFT', { room: getSafeRoom(room) });
             }
           }
         }

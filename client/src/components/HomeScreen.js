@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Crown, LogIn, LogOut, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-const HomeScreen = ({ onCreateRoom, onJoinRoom }) => {
+const HomeScreen = ({ onCreateRoom, onJoinRoom, onViewProfile }) => {
   const { user, signInWithGoogle, signOut, isAuthenticated, loading } = useAuth();
   const [playerName, setPlayerName] = useState('');
   const [roomCode, setRoomCode] = useState('');
@@ -46,7 +46,10 @@ const HomeScreen = ({ onCreateRoom, onJoinRoom }) => {
           <div className="mb-6">
             {isAuthenticated ? (
               <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl p-3">
-                <div className="flex items-center gap-3">
+                <button
+                  onClick={onViewProfile}
+                  className="flex items-center gap-3 hover:opacity-80 transition"
+                >
                   {user?.photoURL ? (
                     <img
                       src={user.photoURL}
@@ -58,11 +61,11 @@ const HomeScreen = ({ onCreateRoom, onJoinRoom }) => {
                       <User size={20} className="text-white" />
                     </div>
                   )}
-                  <div>
+                  <div className="text-left">
                     <div className="font-semibold text-green-800 text-sm">{user?.displayName}</div>
-                    <div className="text-xs text-green-600">{user?.email}</div>
+                    <div className="text-xs text-green-600">View Profile →</div>
                   </div>
-                </div>
+                </button>
                 <button
                   onClick={handleSignOut}
                   className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
@@ -87,7 +90,7 @@ const HomeScreen = ({ onCreateRoom, onJoinRoom }) => {
             )}
             {!isAuthenticated && (
               <p className="text-xs text-gray-500 text-center mt-2">
-                Sign in to enable reconnection if you disconnect
+                Sign in to save your stats and add friends
               </p>
             )}
           </div>
