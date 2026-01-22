@@ -175,22 +175,22 @@ export default function Home() {
     };
   }, [socket, on]);
 
-  const handleCreateRoom = (playerName, googleUid) => {
+  const handleCreateRoom = (playerName, googleUid, customAvatar) => {
     if (!playerName.trim()) {
       alert('Please enter your name');
       return;
     }
-    console.log('[DEBUG CLIENT] Creating room with photoURL:', user?.photoURL);
-    emit('CREATE_ROOM', { playerName, googleUid, photoURL: user?.photoURL || null });
+    console.log('[DEBUG CLIENT] Creating room with customAvatar:', customAvatar);
+    emit('CREATE_ROOM', { playerName, googleUid, photoURL: customAvatar || user?.photoURL || null });
   };
 
-  const handleJoinRoom = (code, playerName, googleUid) => {
+  const handleJoinRoom = (code, playerName, googleUid, customAvatar) => {
     if (!playerName.trim() || !code.trim()) {
       alert('Please enter your name and room code');
       return;
     }
-    console.log('[DEBUG CLIENT] Joining room with photoURL:', user?.photoURL);
-    emit('JOIN_ROOM', { code: code.toUpperCase(), playerName, googleUid, photoURL: user?.photoURL || null });
+    console.log('[DEBUG CLIENT] Joining room with customAvatar:', customAvatar);
+    emit('JOIN_ROOM', { code: code.toUpperCase(), playerName, googleUid, photoURL: customAvatar || user?.photoURL || null });
   };
 
   const handleStartGame = () => {

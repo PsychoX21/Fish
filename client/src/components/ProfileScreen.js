@@ -7,16 +7,16 @@ import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { TEAM_COLORS } from '../lib/constants';
 import FriendsPanel from './FriendsPanel';
 
-// Preset avatars for selection
+// Preset avatars for selection (using Twemoji image URLs)
 const PRESET_AVATARS = [
-    { id: 'fish1', emoji: '🐟', bg: 'bg-blue-500' },
-    { id: 'fish2', emoji: '🐠', bg: 'bg-cyan-500' },
-    { id: 'fish3', emoji: '🐡', bg: 'bg-teal-500' },
-    { id: 'shark', emoji: '🦈', bg: 'bg-gray-600' },
-    { id: 'octopus', emoji: '🐙', bg: 'bg-purple-500' },
-    { id: 'crab', emoji: '🦀', bg: 'bg-red-500' },
-    { id: 'whale', emoji: '🐋', bg: 'bg-indigo-500' },
-    { id: 'dolphin', emoji: '🐬', bg: 'bg-blue-400' },
+    { id: 'fish1', emoji: '🐟', image: 'https://em-content.zobj.net/source/twitter/376/fish_1f41f.png', bg: 'bg-blue-500' },
+    { id: 'fish2', emoji: '🐠', image: 'https://em-content.zobj.net/source/twitter/376/tropical-fish_1f420.png', bg: 'bg-cyan-500' },
+    { id: 'fish3', emoji: '🐡', image: 'https://em-content.zobj.net/source/twitter/376/blowfish_1f421.png', bg: 'bg-teal-500' },
+    { id: 'shark', emoji: '🦈', image: 'https://em-content.zobj.net/source/twitter/376/shark_1f988.png', bg: 'bg-gray-600' },
+    { id: 'octopus', emoji: '🐙', image: 'https://em-content.zobj.net/source/twitter/376/octopus_1f419.png', bg: 'bg-purple-500' },
+    { id: 'crab', emoji: '🦀', image: 'https://em-content.zobj.net/source/twitter/376/crab_1f980.png', bg: 'bg-red-500' },
+    { id: 'whale', emoji: '🐋', image: 'https://em-content.zobj.net/source/twitter/376/whale_1f40b.png', bg: 'bg-indigo-500' },
+    { id: 'dolphin', emoji: '🐬', image: 'https://em-content.zobj.net/source/twitter/376/dolphin_1f42c.png', bg: 'bg-blue-400' },
 ];
 
 const ProfileScreen = ({ onBack }) => {
@@ -81,8 +81,8 @@ const ProfileScreen = ({ onBack }) => {
         if (!file) return;
 
         // Validate file size (2MB for base64 compression)
-        if (file.size > 2 * 1024 * 1024) {
-            alert('File size must be less than 2MB');
+        if (file.size > 1 * 1024 * 1024) {
+            alert('File size must be less than 1MB');
             return;
         }
 
@@ -147,9 +147,11 @@ const ProfileScreen = ({ onBack }) => {
             const preset = PRESET_AVATARS.find(a => a.id === profile.customAvatar);
             if (preset) {
                 return (
-                    <div className={`w-24 h-24 sm:w-32 sm:h-32 ${preset.bg} rounded-full flex items-center justify-center text-5xl sm:text-6xl`}>
-                        {preset.emoji}
-                    </div>
+                    <img
+                        src={preset.image}
+                        alt={preset.emoji}
+                        className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-teal-400 object-cover bg-white p-2"
+                    />
                 );
             }
             // Otherwise it's a base64 image
@@ -505,10 +507,16 @@ const ProfileScreen = ({ onBack }) => {
                                 <button
                                     key={avatar.id}
                                     onClick={() => handleSelectAvatar(avatar.id)}
-                                    className={`aspect-square ${avatar.bg} rounded-xl flex items-center justify-center text-3xl hover:scale-105 transition ${selectedAvatar === avatar.id ? 'ring-4 ring-teal-500 ring-offset-2' : ''
+                                    className={`aspect-square rounded-full overflow-hidden flex items-center justify-center transition border-4 p-2 bg-white ${selectedAvatar === avatar.id
+                                        ? 'border-teal-500 scale-110 shadow-lg'
+                                        : 'border-gray-200 hover:border-teal-300'
                                         }`}
                                 >
-                                    {avatar.emoji}
+                                    <img
+                                        src={avatar.image}
+                                        alt={avatar.emoji}
+                                        className="w-full h-full object-contain"
+                                    />
                                 </button>
                             ))}
                         </div>
@@ -568,7 +576,7 @@ const ProfileScreen = ({ onBack }) => {
                                 >
                                     <Camera className="mx-auto mb-2 text-gray-400" size={32} />
                                     <p className="text-sm text-gray-600 font-medium">Click to select image</p>
-                                    <p className="text-xs text-gray-400 mt-1">JPG, PNG, WebP (Max 2MB)</p>
+                                    <p className="text-xs text-gray-400 mt-1">JPG, PNG, WebP (Max 1MB)</p>
                                 </label>
                             )}
                         </div>

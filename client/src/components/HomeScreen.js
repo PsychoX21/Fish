@@ -1,17 +1,54 @@
 import React, { useState, useEffect } from 'react';
 import { Crown, LogIn, LogOut, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { getOrCreateProfile, getUserAvatar } from '../lib/ProfileService';
+
+// Preset avatars mapping (matches ProfileScreen)
+const PRESET_AVATARS = [
+  { id: 'fish1', image: 'https://em-content.zobj.net/source/twitter/376/fish_1f41f.png' },
+  { id: 'fish2', image: 'https://em-content.zobj.net/source/twitter/376/tropical-fish_1f420.png' },
+  { id: 'fish3', image: 'https://em-content.zobj.net/source/twitter/376/blowfish_1f421.png' },
+  { id: 'shark', image: 'https://em-content.zobj.net/source/twitter/376/shark_1f988.png' },
+  { id: 'octopus', image: 'https://em-content.zobj.net/source/twitter/376/octopus_1f419.png' },
+  { id: 'crab', image: 'https://em-content.zobj.net/source/twitter/376/crab_1f980.png' },
+  { id: 'whale', image: 'https://em-content.zobj.net/source/twitter/376/whale_1f40b.png' },
+  { id: 'dolphin', image: 'https://em-content.zobj.net/source/twitter/376/dolphin_1f42c.png' },
+];
+
+const getPresetAvatarImage = (avatarId) => {
+  const preset = PRESET_AVATARS.find(a => a.id === avatarId);
+  return preset?.image || null;
+};
 
 const HomeScreen = ({ onCreateRoom, onJoinRoom, onViewProfile }) => {
   const { user, signInWithGoogle, signOut, isAuthenticated, loading } = useAuth();
   const [playerName, setPlayerName] = useState('');
   const [roomCode, setRoomCode] = useState('');
+  const [firestoreProfile, setFirestoreProfile] = useState(null);
 
-  // Auto-fill player name from Google account
+  // Load Firestore profile on mount
   useEffect(() => {
-    if (user?.displayName && !playerName) {
-      setPlayerName(user.displayName);
-    }
+    const loadProfile = async () => {
+      if (user?.uid) {
+        try {
+          const profile = await getOrCreateProfile(user);
+          setFirestoreProfile(profile);
+          // Use custom display name if available, otherwise Google name
+          if (profile?.displayName && !playerName) {
+            setPlayerName(profile.displayName);
+          } else if (user?.displayName && !playerName) {
+            setPlayerName(user.displayName);
+          }
+        } catch (error) {
+          console.error('Error loading profile:', error);
+          // Fallback to Google name if profile load fails
+          if (user?.displayName && !playerName) {
+            setPlayerName(user.displayName);
+          }
+        }
+      }
+    };
+    loadProfile();
   }, [user]);
 
   const handleGoogleSignIn = async () => {
@@ -50,7 +87,22 @@ const HomeScreen = ({ onCreateRoom, onJoinRoom, onViewProfile }) => {
                   onClick={onViewProfile}
                   className="flex items-center gap-3 hover:opacity-80 transition"
                 >
-                  {user?.photoURL ? (
+                  {firestoreProfile?.customAvatar ? (
+                    // Show custom avatar (base64 or preset emoji image)
+                    <img
+                      src={firestoreProfile.customAvatar.startsWith('data:')
+                        ? firestoreProfile.customAvatar
+                        : getPresetAvatarImage(firestoreProfile.customAvatar)}
+                      alt={firestoreProfile.displayName || user.displayName}
+                      className="w-10 h-10 rounded-full border-2 border-green-400 object-cover"
+                      onError={(e) => {
+                        // Fallback to Google photo on error
+                        if (user?.photoURL) {
+                          e.target.src = user.photoURL;
+                        }
+                      }}
+                    />
+                  ) : user?.photoURL ? (
                     <img
                       src={user.photoURL}
                       alt={user.displayName}
@@ -62,7 +114,9 @@ const HomeScreen = ({ onCreateRoom, onJoinRoom, onViewProfile }) => {
                     </div>
                   )}
                   <div className="text-left">
-                    <div className="font-semibold text-green-800 text-sm">{user?.displayName}</div>
+                    <div className="font-semibold text-green-800 text-sm">
+                      {firestoreProfile?.displayName || user?.displayName}
+                    </div>
                     <div className="text-xs text-green-600">View Profile →</div>
                   </div>
                 </button>
@@ -108,7 +162,16 @@ const HomeScreen = ({ onCreateRoom, onJoinRoom, onViewProfile }) => {
 
         <div className="space-y-3">
           <button
-            onClick={() => onCreateRoom(playerName, user?.uid)}
+            onClick={() => {
+              // Get custom avatar or fall back to Google photo
+              let avatarToUse = firestoreProfile?.customAvatar || user?.photoURL;
+              // If it's a preset ID (not a base64 string), convert to image URL
+              if (avatarToUse && !avatarToUse.startsWith('data:')) {
+                const imageUrl = getPresetAvatarImage(avatarToUse);
+                avatarToUse = imageUrl || avatarToUse; // Use image URL if found, otherwise keep original
+              }
+              onCreateRoom(playerName, user?.uid, avatarToUse);
+            }}
             disabled={!playerName}
             className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-2.5 sm:py-3 rounded-xl font-semibold hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2 text-sm sm:text-base"
           >
@@ -135,7 +198,16 @@ const HomeScreen = ({ onCreateRoom, onJoinRoom, onViewProfile }) => {
               maxLength={6}
             />
             <button
-              onClick={() => onJoinRoom(roomCode, playerName, user?.uid)}
+              onClick={() => {
+                // Get custom avatar or fall back to Google photo
+                let avatarToUse = firestoreProfile?.customAvatar || user?.photoURL;
+                // If it's a preset ID (not a base64 string), convert to image URL
+                if (avatarToUse && !avatarToUse.startsWith('data:')) {
+                  const imageUrl = getPresetAvatarImage(avatarToUse);
+                  avatarToUse = imageUrl || avatarToUse; // Use image URL if found, otherwise keep original
+                }
+                onJoinRoom(roomCode, playerName, user?.uid, avatarToUse);
+              }}
               disabled={!playerName || !roomCode}
               className="w-full sm:w-auto px-6 sm:px-8 bg-teal-600 text-white py-2.5 sm:py-3 rounded-xl font-semibold hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-sm sm:text-base whitespace-nowrap"
             >
