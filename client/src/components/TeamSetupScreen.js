@@ -268,13 +268,13 @@ const TeamSetupScreen = ({
                             <>
                                 <button
                                     onClick={onRandomizeTeams}
-                                    className="flex-1 flex items-center justify-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 rounded-xl font-semibold transition"
+                                    className="flex-1 flex items-center justify-center gap-2 min-h-[48px] bg-gray-200 hover:bg-gray-300 active:bg-gray-400 text-gray-800 py-3 rounded-xl font-semibold transition"
                                 >
                                     <RefreshCw size={20} /> Randomize Teams
                                 </button>
                                 <button
                                     onClick={onConfirmTeams}
-                                    className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-3 rounded-xl font-bold text-lg hover:shadow-lg transition"
+                                    className="flex-1 flex items-center justify-center gap-2 min-h-[52px] bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-3 rounded-xl font-bold text-lg hover:shadow-lg active:shadow-md transition"
                                 >
                                     <Play size={20} /> Start Game
                                 </button>
@@ -292,7 +292,7 @@ const TeamSetupScreen = ({
                         {isHost && (
                             <button
                                 onClick={onBackToLobby}
-                                className="flex-1 flex items-center justify-center gap-2 bg-amber-100 hover:bg-amber-200 text-amber-700 py-2.5 rounded-xl font-semibold transition"
+                                className="flex-1 flex items-center justify-center gap-2 min-h-[44px] bg-amber-100 hover:bg-amber-200 active:bg-amber-300 text-amber-700 py-2.5 rounded-xl font-semibold transition"
                             >
                                 <ArrowLeft size={18} /> Back to Lobby
                             </button>

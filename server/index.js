@@ -476,6 +476,13 @@ io.on('connection', (socket) => {
     const gameState = room.gameState;
     const claimerTeam = getPlayerTeam(gameState, socket.id);
 
+    // Check if half-suit already claimed (prevent duplicate claims from teammates)
+    if (gameState.claimedHalfSuits.A.includes(halfSuit) ||
+      gameState.claimedHalfSuits.B.includes(halfSuit)) {
+      socket.emit('ERROR', { message: 'This half-suit has already been claimed' });
+      return;
+    }
+
     // Must be claimer's team turn
     if (!gameState.teams[claimerTeam].includes(gameState.currentPlayer)) {
       socket.emit('ERROR', { message: 'Can only claim during your team\'s turn' });
@@ -485,8 +492,8 @@ io.on('connection', (socket) => {
     const validation = validateClaim(gameState, socket.id, halfSuit, distribution, targetTeam);
 
     if (validation.isValid) {
-      // Successful claim - award to the team that actually has the cards
-      gameState.claimedHalfSuits[validation.actualTeam].push(halfSuit);
+      // Successful claim - award to the CLAIMER'S team (not the team with cards)
+      gameState.claimedHalfSuits[claimerTeam].push(halfSuit);
 
       const [suit, type] = halfSuit.split('-');
       const cardList = type === 'low' ? LOW_CARDS : HIGH_CARDS;
@@ -502,7 +509,7 @@ io.on('connection', (socket) => {
         type: 'CLAIM_SUCCESS',
         playerId: socket.id,
         claimerTeam,
-        targetTeam: validation.actualTeam,
+        targetTeam: claimerTeam, // On success, claimer team wins
         halfSuit,
         timestamp: Date.now()
       });
@@ -511,7 +518,7 @@ io.on('connection', (socket) => {
         type: 'CLAIM_SUCCESS',
         playerId: socket.id,
         claimerTeam,
-        awardedTeam: validation.actualTeam,
+        awardedTeam: claimerTeam, // On success, claimer team wins
         halfSuit,
         timestamp: Date.now()
       };

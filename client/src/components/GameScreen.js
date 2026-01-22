@@ -551,27 +551,32 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause, onLea
         )}
 
         {/* Header */}
-        <div className="bg-white/95 backdrop-blur rounded-2xl shadow-xl p-4 mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="text-2xl font-bold text-teal-600">🐟 FISH</div>
-            <div className={`text-sm px-3 py-1 rounded-lg ${TEAM_COLORS[myTeam].bgMedium} border-2 ${TEAM_COLORS[myTeam].border}`}>
+        <div className="bg-white/95 backdrop-blur rounded-2xl shadow-xl p-3 sm:p-4 mb-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <div className="text-xl sm:text-2xl font-bold text-teal-600">🐟 FISH</div>
+            <div className={`text-xs sm:text-sm px-2 sm:px-3 py-1 rounded-lg ${TEAM_COLORS[myTeam].bgMedium} border-2 ${TEAM_COLORS[myTeam].border}`}>
               <div className={`font-bold ${TEAM_COLORS[myTeam].primary}`}>{TEAM_COLORS[myTeam].name}</div>
               <div className="text-xs text-gray-600">
                 Score: {gameState.claimedHalfSuits[myTeam].length}/8
               </div>
             </div>
+            {/* Room Code - visible for reconnecting */}
+            <div className="text-xs bg-gray-100 px-2 py-1 rounded-lg">
+              <span className="text-gray-500">Code:</span>{' '}
+              <span className="font-mono font-bold text-teal-600">{room.code}</span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 sm:gap-2">
             {gameState.isPaused && (
-              <div className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm font-semibold">
+              <div className="bg-amber-100 text-amber-800 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold">
                 PAUSED
               </div>
             )}
             {isMyTeamTurn && (
               <button
                 onClick={onTogglePause}
-                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                className="min-w-[44px] min-h-[44px] p-2 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-lg transition"
                 title={gameState.isPaused ? "Unpause" : "Pause"}
               >
                 {gameState.isPaused ? <Play size={20} /> : <Pause size={20} />}
@@ -579,7 +584,7 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause, onLea
             )}
             <button
               onClick={() => setShowInstructions(true)}
-              className="p-2 bg-blue-100 hover:bg-blue-200 rounded-lg transition"
+              className="min-w-[44px] min-h-[44px] p-2 bg-blue-100 hover:bg-blue-200 active:bg-blue-300 rounded-lg transition"
               title="How to Play"
             >
               <AlertCircle size={20} />
@@ -593,7 +598,7 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause, onLea
                     onDeclareWinner(winningTeam);
                   }
                 }}
-                className="px-3 py-2 bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-lg font-semibold text-sm hover:shadow-lg transition flex items-center gap-1"
+                className="hidden sm:flex min-h-[44px] px-3 py-2 bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-lg font-semibold text-sm hover:shadow-lg transition items-center gap-1"
                 title="End Game Early"
               >
                 <Trophy size={16} />
@@ -602,7 +607,7 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause, onLea
             )}
             <button
               onClick={onLeaveGame}
-              className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition"
+              className="min-w-[44px] min-h-[44px] p-2 bg-red-100 hover:bg-red-200 active:bg-red-300 text-red-600 rounded-lg transition"
               title="Leave Game"
             >
               <LogOut size={20} />
@@ -1123,24 +1128,24 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause, onLea
 
       {/* Card Selector Modal */}
       {showCardSelector && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">
-                Select Card to Ask From {players.find(p => p.id === selectedTarget)?.name}
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 sm:p-4 z-50">
+          <div className="bg-white rounded-2xl p-4 sm:p-6 max-w-4xl w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-3 sm:mb-4">
+              <h2 className="text-lg sm:text-2xl font-bold">
+                Ask {players.find(p => p.id === selectedTarget)?.name}
               </h2>
               <button
                 onClick={() => {
                   setShowCardSelector(false);
                   setSelectedCardToAsk(null);
                 }}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                className="min-w-[44px] min-h-[44px] p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg"
               >
                 <X size={24} />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
               {getUnclaimedCards().map(({ halfSuit, cards }) => {
                 const [suit, type] = halfSuit.split('-');
                 return (
@@ -1205,10 +1210,10 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause, onLea
 
       {/* Claim Modal */}
       {showClaimModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">Make a Claim</h2>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 sm:p-4 z-50">
+          <div className="bg-white rounded-2xl p-4 sm:p-6 max-w-3xl w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-3 sm:mb-4">
+              <h2 className="text-lg sm:text-2xl font-bold">Make a Claim</h2>
               <button
                 onClick={() => {
                   setShowClaimModal(false);
@@ -1216,7 +1221,7 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause, onLea
                   setClaimTargetTeam('');
                   setClaimDistribution({});
                 }}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                className="min-w-[44px] min-h-[44px] p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg"
               >
                 <X size={24} />
               </button>
@@ -1246,7 +1251,7 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause, onLea
                     setClaimDistribution(dist);
                   }
                 }}
-                className="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none"
+                className="w-full p-3 text-base border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none"
               >
                 <option value="">Choose a half-suit...</option>
                 {getAvailableHalfSuits().map(hs => (

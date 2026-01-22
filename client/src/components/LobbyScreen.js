@@ -66,7 +66,7 @@ const LobbyScreen = ({ room, socket, onStartGame, onLeaveRoom, onInviteFriend })
               <span className="font-mono text-xl sm:text-2xl font-bold text-teal-600">{room.code}</span>
               <button
                 onClick={copyRoomCode}
-                className="ml-2 p-2 hover:bg-gray-200 rounded-lg transition"
+                className="ml-2 min-w-[44px] min-h-[44px] p-2 hover:bg-gray-200 active:bg-gray-300 rounded-lg transition"
               >
                 {copied ? <Check size={18} className="text-green-600" /> : <Copy size={18} />}
               </button>
@@ -167,7 +167,7 @@ const LobbyScreen = ({ room, socket, onStartGame, onLeaveRoom, onInviteFriend })
           {isAuthenticated && (
             <button
               onClick={() => setShowFriends(true)}
-              className="w-full bg-purple-100 hover:bg-purple-200 text-purple-700 py-3 rounded-xl font-semibold transition flex items-center justify-center gap-2 mb-3"
+              className="w-full min-h-[48px] bg-purple-100 hover:bg-purple-200 active:bg-purple-300 text-purple-700 py-3 rounded-xl font-semibold transition flex items-center justify-center gap-2 mb-3"
             >
               <UserPlus size={20} />
               Invite Friends
@@ -178,7 +178,7 @@ const LobbyScreen = ({ room, socket, onStartGame, onLeaveRoom, onInviteFriend })
             <button
               onClick={onStartGame}
               disabled={!canStart}
-              className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2 mb-3"
+              className="w-full min-h-[52px] bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg active:shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2 mb-3"
             >
               <Play size={24} />
               Start Game
@@ -195,7 +195,7 @@ const LobbyScreen = ({ room, socket, onStartGame, onLeaveRoom, onInviteFriend })
                 onLeaveRoom();
               }
             }}
-            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-semibold transition flex items-center justify-center gap-2"
+            className="w-full min-h-[48px] bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 py-3 rounded-xl font-semibold transition flex items-center justify-center gap-2"
           >
             <LogOut size={20} />
             {isHost ? 'Close Room' : 'Leave Room'}
