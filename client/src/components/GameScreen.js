@@ -550,28 +550,60 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause, onLea
           </div>
         )}
 
-        {/* Header */}
-        <div className="bg-white/95 backdrop-blur rounded-2xl shadow-xl p-3 sm:p-4 mb-4">
-          {/* Top row: Title, Team, Actions */}
-          <div className="flex items-center justify-between gap-2">
+        {/* Header - Gamified */}
+        <div className="bg-white/95 backdrop-blur rounded-2xl shadow-xl p-3 sm:p-4 mb-4 border border-white/50">
+          {/* Single row layout on desktop, stacked on mobile */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+            {/* Left: Logo + Team Badge with Score */}
             <div className="flex items-center gap-2 sm:gap-3">
-              <div className="text-lg sm:text-2xl font-bold text-teal-600">🐟</div>
-              <div className={`text-xs px-2 py-1 rounded-lg ${TEAM_COLORS[myTeam].bgMedium} border ${TEAM_COLORS[myTeam].border}`}>
-                <span className={`font-bold ${TEAM_COLORS[myTeam].primary}`}>{TEAM_COLORS[myTeam].name}</span>
-                <span className="text-gray-600 ml-1">{gameState.claimedHalfSuits[myTeam].length}/8</span>
+              <div className="relative">
+                <div className="text-2xl sm:text-3xl font-bold text-teal-600 animate-pulse">🐟</div>
+                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-ping"></div>
+              </div>
+
+              {/* Gamified Team Score Badge */}
+              <div className={`relative px-3 py-2 rounded-xl ${TEAM_COLORS[myTeam].bgMedium} border-2 ${TEAM_COLORS[myTeam].border} shadow-lg`}>
+                <div className="flex items-center gap-2">
+                  <span className={`font-bold ${TEAM_COLORS[myTeam].primary}`}>{TEAM_COLORS[myTeam].name}</span>
+                  <div className="flex items-center gap-1">
+                    <div className="relative w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className={`absolute inset-y-0 left-0 ${myTeam === 'A' ? 'bg-gradient-to-r from-cyan-500 to-blue-500' : 'bg-gradient-to-r from-orange-500 to-red-500'} transition-all duration-500 ease-out`}
+                        style={{ width: `${(gameState.claimedHalfSuits[myTeam].length / 8) * 100}%` }}
+                      ></div>
+                    </div>
+                    <span className={`text-sm font-bold ${TEAM_COLORS[myTeam].primary}`}>
+                      {gameState.claimedHalfSuits[myTeam].length}/8
+                    </span>
+                  </div>
+                </div>
+                {gameState.claimedHalfSuits[myTeam].length >= 5 && (
+                  <div className="absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 text-[10px] px-1.5 py-0.5 rounded-full font-bold animate-bounce shadow-lg">
+                    🔥 HOT!
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="flex items-center gap-1">
+            {/* Center: Room Code (visible on desktop inline) */}
+            <div className="hidden sm:flex items-center">
+              <div className="bg-gradient-to-r from-gray-100 to-gray-50 px-4 py-1.5 rounded-full border border-gray-200 shadow-inner">
+                <span className="text-gray-500 text-sm">Room:</span>{' '}
+                <span className="font-mono font-bold text-teal-600 text-lg tracking-wider">{room.code}</span>
+              </div>
+            </div>
+
+            {/* Right: Action Buttons */}
+            <div className="flex items-center gap-1.5 justify-end">
               {gameState.isPaused && (
-                <div className="bg-amber-100 text-amber-800 px-2 py-1 rounded-full text-xs font-semibold">
-                  PAUSED
+                <div className="bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-800 px-3 py-1.5 rounded-full text-xs font-bold border border-amber-300 animate-pulse shadow-sm">
+                  ⏸ PAUSED
                 </div>
               )}
               {isMyTeamTurn && (
                 <button
                   onClick={onTogglePause}
-                  className="w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-lg transition"
+                  className="w-10 h-10 flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 active:from-gray-300 active:to-gray-400 rounded-xl transition shadow-sm hover:shadow"
                   title={gameState.isPaused ? "Unpause" : "Pause"}
                 >
                   {gameState.isPaused ? <Play size={18} /> : <Pause size={18} />}
@@ -579,7 +611,7 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause, onLea
               )}
               <button
                 onClick={() => setShowInstructions(true)}
-                className="w-10 h-10 flex items-center justify-center bg-blue-100 hover:bg-blue-200 active:bg-blue-300 rounded-lg transition"
+                className="w-10 h-10 flex items-center justify-center bg-gradient-to-br from-blue-100 to-blue-200 hover:from-blue-200 hover:to-blue-300 active:from-blue-300 active:to-blue-400 rounded-xl transition shadow-sm hover:shadow text-blue-600"
                 title="How to Play"
               >
                 <AlertCircle size={18} />
@@ -593,16 +625,16 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause, onLea
                       onDeclareWinner(winningTeam);
                     }
                   }}
-                  className="hidden sm:flex h-10 px-3 bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-lg font-semibold text-sm hover:shadow-lg transition items-center gap-1"
+                  className="hidden sm:flex h-10 px-4 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-500 text-white rounded-xl font-bold text-sm hover:shadow-lg hover:scale-105 transition-all items-center gap-1.5 border border-yellow-400"
                   title="End Game Early"
                 >
                   <Trophy size={16} />
-                  End
+                  End Game
                 </button>
               )}
               <button
                 onClick={onLeaveGame}
-                className="w-10 h-10 flex items-center justify-center bg-red-100 hover:bg-red-200 active:bg-red-300 text-red-600 rounded-lg transition"
+                className="w-10 h-10 flex items-center justify-center bg-gradient-to-br from-red-100 to-red-200 hover:from-red-200 hover:to-red-300 active:from-red-300 active:to-red-400 text-red-600 rounded-xl transition shadow-sm hover:shadow"
                 title="Leave Game"
               >
                 <LogOut size={18} />
@@ -610,11 +642,11 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause, onLea
             </div>
           </div>
 
-          {/* Bottom row: Room code */}
-          <div className="mt-2 flex items-center justify-center">
-            <div className="text-xs bg-gray-100 px-3 py-1 rounded-full">
-              <span className="text-gray-500">Room Code:</span>{' '}
-              <span className="font-mono font-bold text-teal-600">{room.code}</span>
+          {/* Mobile-only: Room code row */}
+          <div className="mt-2 flex sm:hidden items-center justify-center">
+            <div className="bg-gradient-to-r from-gray-100 to-gray-50 px-4 py-1.5 rounded-full border border-gray-200 shadow-inner">
+              <span className="text-gray-500 text-xs">Room:</span>{' '}
+              <span className="font-mono font-bold text-teal-600 tracking-wider">{room.code}</span>
             </div>
           </div>
         </div>
@@ -623,10 +655,13 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause, onLea
           {/* Left: Team Members */}
           <div className="bg-white/95 backdrop-blur rounded-2xl shadow-xl p-4">
 
-            {/* You */}
-            <div className={`mb-4 ${TEAM_COLORS[myTeam].bg} p-3 rounded-xl border-2 ${TEAM_COLORS[myTeam].border}`}>
-              <div className="flex items-center gap-2 mb-2">
-                <div className={`w-10 h-10 ${TEAM_COLORS[myTeam].avatar} text-white rounded-full flex items-center justify-center font-bold overflow-hidden flex-shrink-0`}>
+            {/* You - Gamified Player Card */}
+            <div className={`mb-4 relative ${TEAM_COLORS[myTeam].bg} p-3 rounded-xl border-2 ${isMyTurn ? 'border-green-400 shadow-[0_0_15px_rgba(34,197,94,0.5)]' : TEAM_COLORS[myTeam].border} transition-all duration-300`}>
+              {isMyTurn && (
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-green-400/20 via-emerald-400/10 to-green-400/20 animate-pulse"></div>
+              )}
+              <div className="relative flex items-center gap-3 mb-2">
+                <div className={`relative w-12 h-12 ${TEAM_COLORS[myTeam].avatar} text-white rounded-full flex items-center justify-center font-bold overflow-hidden flex-shrink-0 ${isMyTurn ? 'ring-2 ring-green-400 ring-offset-2' : ''}`}>
                   {myPlayer?.photoURL ? (
                     <img
                       src={myPlayer.photoURL}
@@ -640,17 +675,30 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause, onLea
                   ) : (
                     myPlayer?.name[0].toUpperCase()
                   )}
+                  {isMyTurn && (
+                    <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
+                      <span className="text-[8px]">⚡</span>
+                    </div>
+                  )}
                 </div>
-                <div className={`font-semibold ${TEAM_COLORS[myTeam].primaryDark}`}>
-                  {players.find(p => p.id === socket.id)?.name} (You)
+                <div className="flex-1">
+                  <div className={`font-bold text-base ${TEAM_COLORS[myTeam].primaryDark}`}>
+                    {players.find(p => p.id === socket.id)?.name}
+                    <span className="text-gray-500 font-normal text-sm ml-1">(You)</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="flex items-center gap-1 bg-white/80 px-2 py-0.5 rounded-full text-xs shadow-sm">
+                      <span className="text-gray-600">🃏</span>
+                      <span className="font-bold text-gray-800">{myHand.length}</span>
+                      <span className="text-gray-500">cards</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="text-xs text-gray-600">
-                {myHand.length} cards
               </div>
               {isMyTurn && (
-                <div className="text-xs text-green-600 font-semibold mt-1">
-                  Your Turn
+                <div className="relative bg-gradient-to-r from-green-500 to-emerald-500 text-white text-sm font-bold py-2 px-4 rounded-lg text-center shadow-lg">
+                  <span className="relative z-10">⚡ YOUR TURN!</span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-emerald-400 rounded-lg animate-pulse opacity-50"></div>
                 </div>
               )}
             </div>
@@ -801,14 +849,26 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause, onLea
 
           {/* Center: Game Area */}
           <div className="bg-white/95 backdrop-blur rounded-2xl shadow-xl p-4">
+            {/* Gamified Turn Banner */}
             <div className="mb-4">
               {isMyTurn ? (
-                <div className="bg-green-100 border border-green-500 text-green-800 p-3 rounded-xl text-center font-semibold">
-                  Your Turn!
+                <div className="relative overflow-hidden bg-gradient-to-r from-green-500 via-emerald-500 to-green-500 text-white p-4 rounded-xl text-center font-bold text-lg shadow-lg">
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse"></div>
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    <span className="text-xl animate-bounce">⚡</span>
+                    Your Turn - Make Your Move!
+                    <span className="text-xl animate-bounce" style={{ animationDelay: '0.1s' }}>⚡</span>
+                  </span>
                 </div>
               ) : (
-                <div className="bg-gray-100 text-gray-600 p-3 rounded-xl text-center">
-                  {players.find(p => p.id === gameState.currentPlayer)?.name}'s Turn
+                <div className="bg-gradient-to-r from-gray-100 to-gray-50 text-gray-700 p-4 rounded-xl text-center border border-gray-200">
+                  <span className="text-gray-500">Waiting for</span>{' '}
+                  <span className="font-bold text-gray-800">{players.find(p => p.id === gameState.currentPlayer)?.name}</span>
+                  <span className="ml-2 inline-flex">
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></span>
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce ml-1" style={{ animationDelay: '0.15s' }}></span>
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce ml-1" style={{ animationDelay: '0.3s' }}></span>
+                  </span>
                 </div>
               )}
             </div>
@@ -872,11 +932,22 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause, onLea
               <button
                 onClick={handleOpenCardSelector}
                 disabled={!selectedTarget}
-                className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-3 rounded-xl font-bold mb-4 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition"
+                className={`relative w-full py-4 rounded-xl font-bold text-lg mb-4 transition-all ${selectedTarget
+                  ? 'bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-600 text-white hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]'
+                  : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
               >
-                {selectedTarget
-                  ? `Ask ${players.find(p => p.id === selectedTarget)?.name} for a card`
-                  : 'Select an opponent first'}
+                {selectedTarget ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="text-xl">🎯</span>
+                    Ask {players.find(p => p.id === selectedTarget)?.name} for a card
+                    <span className="text-xl">→</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="text-lg">👆</span>
+                    Select an opponent first
+                  </span>
+                )}
               </button>
             )}
 
@@ -917,50 +988,106 @@ const GameScreen = ({ room, socket, onAskCard, onMakeClaim, onTogglePause, onLea
             <button
               onClick={handleOpenClaimModal}
               disabled={!isMyTeamTurn}
-              className="w-full bg-amber-500 hover:bg-amber-600 text-white py-2 rounded-xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`relative w-full py-3 rounded-xl font-bold text-lg transition-all ${isMyTeamTurn
+                ? 'bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-500 text-white hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] border border-yellow-400'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
             >
-              Make Claim
+              <span className="flex items-center justify-center gap-2">
+                <Trophy size={20} className={isMyTeamTurn ? 'text-yellow-200' : 'text-gray-300'} />
+                Make Claim
+                <Trophy size={20} className={isMyTeamTurn ? 'text-yellow-200' : 'text-gray-300'} />
+              </span>
             </button>
 
-            <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-              <div className={`${TEAM_COLORS.A.bg} p-2 rounded border ${TEAM_COLORS.A.borderLight}`}>
-                <div className={`font-semibold ${TEAM_COLORS.A.primary}`}>{TEAM_COLORS.A.name}</div>
-                <div className="text-gray-600">
-                  {gameState.claimedHalfSuits.A.length} claimed
+            {/* Gamified Score Display */}
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              {/* Team A Score */}
+              <div className={`relative ${TEAM_COLORS.A.bg} p-3 rounded-xl border-2 ${gameState.claimedHalfSuits.A.length >= 5 ? 'border-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.4)]' : TEAM_COLORS.A.borderLight} transition-all`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className={`font-bold ${TEAM_COLORS.A.primary}`}>{TEAM_COLORS.A.name}</span>
+                  <span className="text-lg font-bold text-gray-800">{gameState.claimedHalfSuits.A.length}/8</span>
                 </div>
+                <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-500 ease-out rounded-full"
+                    style={{ width: `${(gameState.claimedHalfSuits.A.length / 8) * 100}%` }}
+                  ></div>
+                </div>
+                {gameState.claimedHalfSuits.A.length >= 5 && (
+                  <div className="absolute -top-2 -right-2 text-lg animate-bounce">🏆</div>
+                )}
               </div>
-              <div className={`${TEAM_COLORS.B.bg} p-2 rounded border ${TEAM_COLORS.B.borderLight}`}>
-                <div className={`font-semibold ${TEAM_COLORS.B.primary}`}>{TEAM_COLORS.B.name}</div>
-                <div className="text-gray-600">
-                  {gameState.claimedHalfSuits.B.length} claimed
+
+              {/* Team B Score */}
+              <div className={`relative ${TEAM_COLORS.B.bg} p-3 rounded-xl border-2 ${gameState.claimedHalfSuits.B.length >= 5 ? 'border-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.4)]' : TEAM_COLORS.B.borderLight} transition-all`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className={`font-bold ${TEAM_COLORS.B.primary}`}>{TEAM_COLORS.B.name}</span>
+                  <span className="text-lg font-bold text-gray-800">{gameState.claimedHalfSuits.B.length}/8</span>
                 </div>
+                <div className="relative w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-orange-500 to-red-500 transition-all duration-500 ease-out rounded-full"
+                    style={{ width: `${(gameState.claimedHalfSuits.B.length / 8) * 100}%` }}
+                  ></div>
+                </div>
+                {gameState.claimedHalfSuits.B.length >= 5 && (
+                  <div className="absolute -top-2 -right-2 text-lg animate-bounce">🏆</div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Right: My Hand*/}
-          <div className="bg-white/95 backdrop-blur rounded-2xl shadow-xl p-4">
-            <h3 className="font-bold text-lg mb-3 text-gray-800">
-              My Hand ({myHand.length})
-            </h3>
-
-            <div className="space-y-3">
-              {orderedHalfSuits.map(hs => (
-                <div key={hs}>
-                  <div className="text-xs font-semibold text-gray-500 mb-1 uppercase">
-                    {hs.replace('-', ' ')}
-                  </div>
-
-                  <div className="flex gap-2">
-                    {groupedHand[hs].map(card => (
-                      <Card
-                        key={card.id}
-                        card={card}
-                      />
-                    ))}
-                  </div>
+          {/* Right: My Hand - Gamified */}
+          <div className="bg-white/95 backdrop-blur rounded-2xl shadow-xl p-4 border border-white/50">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
+                <span className="text-xl">🃏</span>
+                My Hand
+              </h3>
+              <div className="flex items-center gap-2">
+                <div className="bg-gradient-to-r from-teal-500 to-emerald-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-sm">
+                  {myHand.length} cards
                 </div>
-              ))}
+                {myHand.length === 0 && (
+                  <div className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs font-semibold">
+                    Empty!
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {orderedHalfSuits.map(hs => {
+                const isComplete = groupedHand[hs].length === 6;
+                return (
+                  <div key={hs} className={`p-3 rounded-xl ${isComplete ? 'bg-gradient-to-r from-yellow-50 to-amber-50 border-2 border-yellow-300' : 'bg-gray-50'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className={`text-xs font-bold uppercase tracking-wider ${isComplete ? 'text-yellow-700' : 'text-gray-500'}`}>
+                        {hs.replace('-', ' ')}
+                      </div>
+                      <div className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${isComplete ? 'bg-yellow-400 text-yellow-900' : 'bg-gray-200 text-gray-600'}`}>
+                        {groupedHand[hs].length}/6
+                      </div>
+                      {isComplete && <span className="text-sm animate-pulse">⭐</span>}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {groupedHand[hs].map(card => (
+                        <Card
+                          key={card.id}
+                          card={card}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+              {orderedHalfSuits.length === 0 && (
+                <div className="text-center py-8 text-gray-400">
+                  <div className="text-4xl mb-2">🎴</div>
+                  <p>No cards in hand</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
